@@ -1,10 +1,12 @@
 ARG BUILD_FROM
+FROM louislam/dockge:1.5.0 as dockge
+
 FROM $BUILD_FROM
 
 # Build arguments for version
 ARG DOCKGE_VERSION=1.5.0
 
-# Install requirements and Node.js
+# Install requirements
 RUN \
     apk add --no-cache \
         bash \
@@ -12,21 +14,11 @@ RUN \
         curl \
         jq \
         nodejs \
-        npm \
-        git
+        npm
 
-# Install Dockge
+# Copy Dockge from official image
+COPY --from=dockge /app /app
 WORKDIR /app
-RUN \
-    git clone --branch ${DOCKGE_VERSION} https://github.com/louislam/dockge.git /tmp/dockge \
-    && cd /tmp/dockge \
-    && npm ci --production \
-    && npm run build \
-    && mv /tmp/dockge/backend /app/ \
-    && mv /tmp/dockge/frontend /app/ \
-    && mv /tmp/dockge/node_modules /app/ \
-    && mv /tmp/dockge/package.json /app/ \
-    && rm -rf /tmp/dockge
 
 # Copy root filesystem
 COPY rootfs /
