@@ -1,0 +1,107 @@
+#include <tunables/global>
+
+profile dockge flags=(attach_disconnected,mediate_deleted) {
+  #include <abstractions/base>
+
+  # Capabilities
+  capability,
+  file,
+  signal,
+  mount,
+  umount,
+  remount,
+  pivot_root,
+
+  # S6-Overlay
+  /init ix,
+  /run/{s6,s6-rc*,service}/** ix,
+  /package/** ix,
+  /command/** ix,
+  /etc/services.d/** rwix,
+  /etc/cont-init.d/** rwix,
+  /etc/cont-finish.d/** rwix,
+  /etc/fix-attrs.d/** rw,
+  /etc/s6/** ixr,
+  /etc/s6-rc/** ixr,
+  /run/{s6,s6-rc*,service}/** rwix,
+  /package/** ix,
+  /command/** ix,
+  /bin/** ix,
+  /usr/bin/** ix,
+  /usr/lib/bashio/** ix,
+  /etc/s6/** rwix,
+  /run/{s6,s6-rc*,service}/** rwix,
+  /package/** ix,
+  /command/** ix,
+  /run/{,**} rwk,
+  /dev/tty rw,
+
+  # Bashio
+  /usr/lib/bashio/** ix,
+  /tmp/** rwk,
+
+  # Access to options.json and other files within your addon
+  /data/** rw,
+
+  # Start new profile for service
+  /usr/bin/node cx -> node,
+
+  profile node {
+    #include <abstractions/base>
+
+    # Receive signals from S6-Overlay
+    signal receive,
+    signal peer=*_dockge,
+
+    # Access to Node.js and app files
+    /usr/bin/node r,
+    /app/** r,
+    /app/data/** rw,
+    /data/** rw,
+
+    # Access to Docker socket
+    /var/run/docker.sock rw,
+
+    # Network access
+    network tcp,
+    network udp,
+
+    # System access
+    /proc/sys/net/core/somaxconn r,
+    /etc/hosts r,
+    /etc/resolv.conf r,
+    /etc/nsswitch.conf r,
+    /etc/passwd r,
+    /etc/group r,
+    /etc/localtime r,
+    /usr/share/zoneinfo/** r,
+
+    # Tmp files
+    /tmp/** rw,
+    /var/tmp/** rw,
+
+    # Docker client access
+    /usr/bin/docker rix,
+    
+    # Required for Docker operations
+    /sys/fs/cgroup/** r,
+    /proc/** r,
+    /dev/null rw,
+    /dev/urandom r,
+    /dev/random r,
+    
+    # Node modules
+    owner /app/node_modules/** r,
+    
+    # Dockge specific paths
+    /data/stacks/** rw,
+    /opt/stacks/** rw,
+    /share/** rw,
+    /backup/** rw,
+    /media/** rw,
+    /addons/** rw,
+    
+    # SSL certificates
+    /ssl/** r,
+  }
+}

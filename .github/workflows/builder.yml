@@ -28,6 +28,7 @@ jobs:
           files: |
             portainer_ee_lts/**
             portainer_ee_sts/**
+            dockge/**
 
       - name: Find changed add-ons
         id: changed_addons
@@ -36,7 +37,7 @@ jobs:
 
           # Check if any addon files changed
           if [[ "${{ steps.changed_files.outputs.any_changed }}" == "true" ]]; then
-            for addon in portainer_ee_lts portainer_ee_sts; do
+            for addon in portainer_ee_lts portainer_ee_sts dockge; do
               if [[ "${{ steps.changed_files.outputs.all_changed_files }}" =~ $addon ]]; then
                 changed_addons+=("\"${addon}\"");
               fi
@@ -44,7 +45,7 @@ jobs:
           else
             # If no changes detected (e.g., initial commit), build all addons
             echo "No changed files detected, building all addons"
-            changed_addons=("\"portainer_ee_lts\"" "\"portainer_ee_sts\"")
+            changed_addons=("\"portainer_ee_lts\"" "\"portainer_ee_sts\"" "\"dockge\"")
           fi
 
           changed=$(echo ${changed_addons[@]} | jq -sc '.')
