@@ -75,5 +75,4 @@ jobs:
           args: |
             --test \
             --target /data/${{ matrix.addon }} \
-            --docker-hub-check \
             --all
