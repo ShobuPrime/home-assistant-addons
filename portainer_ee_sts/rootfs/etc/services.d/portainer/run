@@ -1,0 +1,81 @@
+#!/usr/bin/with-contenv bashio
+# ==============================================================================
+# Home Assistant Add-on: Portainer EE
+# Runs Portainer
+# ==============================================================================
+declare -a options
+export AGENT_SECRET
+export LICENSE_KEY
+# Disable CSP to allow iframe/ingress embedding (required for Portainer 2.33.0+)
+export CSP=false
+
+bashio::log.info 'Starting Portainer EE...'
+
+# Basic options
+options+=(--data /data/portainer)
+options+=(--bind 0.0.0.0:9000)
+options+=(--bind-https 0.0.0.0:9443)
+options+=(--tunnel-port 8000)
+options+=(--host unix:///var/run/docker.sock)
+
+# SSL Configuration
+if bashio::config.true 'ssl' && bashio::fs.file_exists "/ssl/fullchain.pem" && bashio::fs.file_exists "/ssl/privkey.pem"; then
+    options+=(--sslcert /ssl/fullchain.pem)
+    options+=(--sslkey /ssl/privkey.pem)
+    bashio::log.info "SSL certificates configured"
+fi
+
+# Export agent secret, if defined
+if bashio::config.has_value 'agent_secret'; then
+    AGENT_SECRET=$(bashio::config 'agent_secret')
+    bashio::log.info "Agent secret configured"
+fi
+
+# Export license key for Business Edition, if defined
+if bashio::config.has_value 'license_key'; then
+    LICENSE_KEY=$(bashio::config 'license_key')
+    bashio::log.info "License key configured for Business Edition"
+fi
+
+# Hide Home Assistant containers option
+bashio::log.info "hide_hassio_containers config value: $(bashio::config 'hide_hassio_containers')"
+if bashio::config.true 'hide_hassio_containers'; then
+    bashio::log.info "Hiding Home Assistant system containers"
+    options+=("--hide-label=io.hass.type=supervisor")
+    options+=("--hide-label=io.hass.type=addon")
+    options+=("--hide-label=io.hass.type=core")
+    options+=("--hide-label=io.hass.type=audio")
+    options+=("--hide-label=io.hass.type=dns")
+    options+=("--hide-label=io.hass.type=multicast")
+    options+=("--hide-label=io.hass.type=cli")
+    options+=("--hide-label=io.hass.type=observer")
+else
+    bashio::log.info "NOT hiding Home Assistant system containers"
+fi
+
+# Log level configuration
+if bashio::config.has_value 'log_level'; then
+    case "$(bashio::config 'log_level')" in
+        trace|debug)
+            options+=(--log-level DEBUG)
+            ;;
+        warning|error|fatal)
+            options+=(--log-level ERROR)
+            ;;
+        *)
+            options+=(--log-level INFO)
+            ;;
+    esac
+fi
+
+# Analytics are disabled by default in Portainer 2.0+
+# The --no-analytics flag is deprecated but kept for compatibility
+
+# Show final command for debugging
+bashio::log.info "Starting Portainer with options:"
+for opt in "${options[@]}"; do
+    bashio::log.info "  ${opt}"
+done
+
+# Run Portainer
+exec /opt/portainer/portainer "${options[@]}"

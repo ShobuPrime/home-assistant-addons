@@ -1,0 +1,31 @@
+name: Builder
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  pull_request:
+    branches:
+      - main
+      - master
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    name: Build add-ons
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Get changed files
+        id: changed-files
+        uses: tj-actions/changed-files@v41
+
+      - name: Build add-ons
+        uses: home-assistant/builder@master
+        with:
+          args: |
+            --all \
+            --test \
+            --docker-hub-check
