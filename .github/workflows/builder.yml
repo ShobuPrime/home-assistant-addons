@@ -75,4 +75,6 @@ jobs:
           args: |
             --test \
             --target /data/${{ matrix.addon }} \
+            --docker-hub shobuprime \
+            --image ${{ matrix.addon }} \
             --all
