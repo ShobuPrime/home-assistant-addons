@@ -1,4 +1,4 @@
-# Portainer EE Documentation
+# Portainer 2.35.0EE Documentation
 
 ## Configuration
 
@@ -22,16 +22,16 @@ Note: Both HTTP (port 9000) and HTTPS (port 9443) are always available.
 
 ### Option: `agent_secret`
 
-Sets a secret for Portainer agents when managing remote Docker environments.
+Sets a secret for Portainer 2.35.0agents when managing remote Docker environments.
 
 ### Option: `hide_hassio_containers`
 
-When enabled (default), hides Home Assistant system containers from the Portainer interface.
+When enabled (default), hides Home Assistant system containers from the Portainer 2.35.0interface.
 - `true`: Hide all containers with `io.hass.type` labels (supervisor, core, audio, dns, multicast, cli, observer, addon)
 - `false`: Show all containers
 
-**Important**: Due to how Portainer caches settings, changes to this option may require manual intervention:
-1. If changing from `true` to `false`: Go to Portainer Settings → Hidden containers to unhide them
+**Important**: Due to how Portainer 2.35.0caches settings, changes to this option may require manual intervention:
+1. If changing from `true` to `false`: Go to Portainer 2.35.0Settings → Hidden containers to unhide them
 2. If changing from `false` to `true`: The containers will be hidden automatically on next restart
 
 ## Access Methods

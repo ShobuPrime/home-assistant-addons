@@ -1,4 +1,4 @@
-# Portainer EE (LTS) Add-on for Home Assistant
+# Portainer 2.35.0EE (LTS) Add-on for Home Assistant
 
 ![Supports aarch64 Architecture][aarch64-shield]
 ![Supports amd64 Architecture][amd64-shield]
@@ -6,11 +6,11 @@
 ![Supports armv7 Architecture][armv7-shield]
 ![Supports i386 Architecture][i386-shield]
 
-Manage your Docker environment with ease using Portainer Enterprise Edition (Long Term Support).
+Manage your Docker environment with ease using Portainer 2.35.0Enterprise Edition (Long Term Support).
 
 ## About
 
-Portainer is a lightweight management UI which allows you to easily manage your Docker environments. This add-on brings Portainer EE LTS (Long Term Support) to Home Assistant, integrating it seamlessly with the sidebar and providing easy access to all Docker management features.
+Portainer 2.35.0is a lightweight management UI which allows you to easily manage your Docker environments. This add-on brings Portainer 2.35.0EE LTS (Long Term Support) to Home Assistant, integrating it seamlessly with the sidebar and providing easy access to all Docker management features.
 
 **Note**: This is the LTS version with odd minor version numbers (2.21.x, 2.23.x, 2.27.x, 2.33.x, etc.). For the latest features with STS (Short Term Support), see the `portainer_ee_sts` addon.
 
@@ -33,7 +33,7 @@ Portainer is a lightweight management UI which allows you to easily manage your 
 ## Installation
 
 1. Add this repository to your Home Assistant instance
-2. Search for "Portainer EE (LTS)" in the add-on store
+2. Search for "Portainer 2.35.0EE (LTS)" in the add-on store
 3. Click Install
 4. Configure the add-on options (if needed)
 5. Start the add-on
@@ -57,18 +57,18 @@ dealing with an unknown issue. Possible values are:
 ### Option: `ssl`
 
 Enables/Disables custom SSL certificates for HTTPS (port 9443). When enabled, 
-Portainer will use the certificates from `/ssl/fullchain.pem` and `/ssl/privkey.pem`.
-When disabled, Portainer uses self-signed certificates. Both HTTP (9000) and HTTPS 
+Portainer 2.35.0will use the certificates from `/ssl/fullchain.pem` and `/ssl/privkey.pem`.
+When disabled, Portainer 2.35.0uses self-signed certificates. Both HTTP (9000) and HTTPS 
 (9443) are always available.
 
 ### Option: `agent_secret`
 
-Sets a secret for the Portainer agent. This is useful when managing edge agents
+Sets a secret for the Portainer 2.35.0agent. This is useful when managing edge agents
 or remote Docker environments.
 
 ### Option: `license_key`
 
-Provides your Portainer Business Edition license key. When configured, this enables
+Provides your Portainer 2.35.0Business Edition license key. When configured, this enables
 Business Edition features including:
 - Advanced RBAC and team management
 - GitOps automation
@@ -80,11 +80,11 @@ To obtain a license key, visit [Portainer.io](https://www.portainer.io/pricing) 
 purchase or request a trial. Leave empty to use the free Community Edition features.
 
 **Note**: The license key is stored as a password field for security and is passed
-to Portainer via the `LICENSE_KEY` environment variable.
+to Portainer 2.35.0via the `LICENSE_KEY` environment variable.
 
 ### Option: `hide_hassio_containers`
 
-When enabled (default), hides Home Assistant system containers from the Portainer 
+When enabled (default), hides Home Assistant system containers from the Portainer 2.35.0
 interface. This includes supervisor, core, audio, dns, multicast, cli, observer, 
 and addon containers.
 
@@ -100,7 +100,7 @@ This addon has access to the following Home Assistant directories:
 - `/media` - Home Assistant media folder (read/write)
 - `/share` - Home Assistant share folder (read/write)
 
-These folders are accessible from within Portainer and can be mounted as volumes when creating or managing containers. For example, you can mount `/share` into a container to share files between Home Assistant and your Docker containers.
+These folders are accessible from within Portainer 2.35.0and can be mounted as volumes when creating or managing containers. For example, you can mount `/share` into a container to share files between Home Assistant and your Docker containers.
 
 ## First Time Setup
 
@@ -110,13 +110,13 @@ These folders are accessible from within Portainer and can be mounted as volumes
 
 ## Known Issues
 
-### Portainer 2.33.0+ Ingress Compatibility
+### Portainer 2.35.0+ Ingress Compatibility
 
-**Issue**: Portainer versions 2.33.0 and later introduced Content-Security-Policy headers that block iframe embedding, which prevents access through Home Assistant's ingress.
+**Issue**: Portainer 2.35.0versions 2.33.0 and later introduced Content-Security-Policy headers that block iframe embedding, which prevents access through Home Assistant's ingress.
 
 **Fix**: This add-on automatically sets `CSP=false` to disable the restrictive CSP headers and restore ingress functionality. If you experience access issues after updating, rebuild the add-on.
 
-**Security Note**: Disabling CSP is necessary for Home Assistant integration but reduces some security protections. For enhanced security, you can access Portainer directly via ports 9000 (HTTP) or 9443 (HTTPS) instead of through ingress.
+**Security Note**: Disabling CSP is necessary for Home Assistant integration but reduces some security protections. For enhanced security, you can access Portainer 2.35.0directly via ports 9000 (HTTP) or 9443 (HTTPS) instead of through ingress.
 
 ## Support
 
@@ -156,5 +156,5 @@ For manual updates and more details, see [UPDATE_GUIDE.md](UPDATE_GUIDE.md).
 
 ## Version
 
-Currently running Portainer 2.33.2 LTS
+Currently running Portainer 2.35.0 LTS
 
