@@ -55,7 +55,12 @@ The repository includes comprehensive automation for managing pull requests:
 ### Automatic Version Updates
 - Daily checks for new Portainer releases (LTS and STS)
 - Automatically creates PRs with version updates and changelogs
+- **IMPORTANT:** Version detection is based on GitHub release **names** containing "LTS" or "STS"
+  - Do NOT use version number patterns (odd/even) - Portainer does not follow a consistent mathematical pattern
+  - The script filters releases by searching for "LTS" or "STS" in the release name via GitHub API
 - Updates documentation with conservative regex patterns to avoid breaking section headers
+  - Only updates "Currently running Portainer X.X.X" and similar specific version references
+  - Does NOT update section headers like "Portainer 2.33+ Ingress Compatibility"
 
 ### PR Validation
 - Validates repository structure (required files, config format)
@@ -82,6 +87,11 @@ Use the helper script to control auto-merge behavior:
 # Unblock auto-merge
 .github/scripts/manage-automerge.sh <pr-number> unblock
 ```
+
+### Action Required for PR #1
+- **Do NOT merge PR #1** - It incorrectly updated LTS addon to 2.35.0 (an STS version)
+- The LTS addon should remain at 2.33.2 (latest LTS) or be manually corrected
+- Future automated PRs will use the corrected logic
 
 See [`.github/AUTOMATION.md`](.github/AUTOMATION.md) for complete documentation.
 

@@ -31,15 +31,28 @@ get_latest_version() {
     local version=""
 
     for i in $(seq 1 $retries); do
+        # Fetch all non-prerelease releases
+        local releases=$(curl -s --connect-timeout 10 https://api.github.com/repos/portainer/portainer/releases 2>/dev/null)
+
+        if [ -z "$releases" ]; then
+            [ $i -lt $retries ] && log "Retry $i/$retries..." >&2
+            sleep $delay
+            continue
+        fi
+
         if [ "$version_type" = "lts" ]; then
-            # LTS versions have odd minor numbers (2.21.x, 2.23.x, 2.25.x, 2.27.x, 2.33.x, etc.)
-            version=$(curl -s --connect-timeout 10 https://api.github.com/repos/portainer/portainer/releases 2>/dev/null | \
-                jq -r '.[] | select(.tag_name | test("^[0-9]+\\.[0-9]*[13579]\\.[0-9]+$")) | select(.prerelease == false) | .tag_name' 2>/dev/null | \
+            # LTS versions are explicitly marked with "LTS" in the release name
+            # Filter by release name containing "LTS" (case-insensitive)
+            version=$(echo "$releases" | \
+                jq -r '.[] | select(.prerelease == false) | select(.name | test("LTS"; "i")) | .tag_name' 2>/dev/null | \
+                grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' | \
                 head -1)
         else
-            # STS versions have even minor numbers (2.20.x, 2.22.x, 2.24.x, 2.32.x, 2.34.x, etc.)
-            version=$(curl -s --connect-timeout 10 https://api.github.com/repos/portainer/portainer/releases 2>/dev/null | \
-                jq -r '.[] | select(.tag_name | test("^[0-9]+\\.[0-9]*[02468]\\.[0-9]+$")) | select(.prerelease == false) | .tag_name' 2>/dev/null | \
+            # STS versions are explicitly marked with "STS" in the release name
+            # Filter by release name containing "STS" (case-insensitive)
+            version=$(echo "$releases" | \
+                jq -r '.[] | select(.prerelease == false) | select(.name | test("STS"; "i")) | .tag_name' 2>/dev/null | \
+                grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' | \
                 head -1)
         fi
 
