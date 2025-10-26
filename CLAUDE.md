@@ -88,11 +88,6 @@ Use the helper script to control auto-merge behavior:
 .github/scripts/manage-automerge.sh <pr-number> unblock
 ```
 
-### Action Required for PR #1
-- **Do NOT merge PR #1** - It incorrectly updated LTS addon to 2.35.0 (an STS version)
-- The LTS addon should remain at 2.33.2 (latest LTS) or be manually corrected
-- Future automated PRs will use the corrected logic
-
 See [`.github/AUTOMATION.md`](.github/AUTOMATION.md) for complete documentation.
 
 ## Git Commit Guidelines
