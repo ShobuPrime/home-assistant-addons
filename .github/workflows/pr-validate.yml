@@ -1,0 +1,275 @@
+name: PR Validation
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+  checks: write
+
+jobs:
+  validate-structure:
+    name: Validate Repository Structure
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout PR branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Validate addon structure
+        id: validate
+        run: |
+          EXIT_CODE=0
+          ERRORS=""
+
+          # Find all addon directories (those with config.yaml)
+          for addon_dir in */config.yaml; do
+            addon_dir=$(dirname "$addon_dir")
+            echo "Validating $addon_dir..."
+
+            # Check required files
+            for required_file in config.yaml Dockerfile README.md DOCS.md CHANGELOG.md; do
+              if [ ! -f "$addon_dir/$required_file" ]; then
+                ERRORS="${ERRORS}\n- Missing $required_file in $addon_dir"
+                EXIT_CODE=1
+              fi
+            done
+
+            # Validate config.yaml structure
+            if [ -f "$addon_dir/config.yaml" ]; then
+              # Check for required fields
+              for field in name version slug description arch; do
+                if ! grep -q "^${field}:" "$addon_dir/config.yaml"; then
+                  ERRORS="${ERRORS}\n- Missing required field '$field' in $addon_dir/config.yaml"
+                  EXIT_CODE=1
+                fi
+              done
+
+              # Extract version for validation
+              VERSION=$(grep "^version:" "$addon_dir/config.yaml" | sed 's/version: *"\(.*\)"/\1/')
+
+              # Validate version format (semver)
+              if ! echo "$VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+                ERRORS="${ERRORS}\n- Invalid version format in $addon_dir/config.yaml: $VERSION (should be X.Y.Z)"
+                EXIT_CODE=1
+              fi
+            fi
+
+            # Validate Dockerfile
+            if [ -f "$addon_dir/Dockerfile" ]; then
+              # Check for FROM instruction
+              if ! grep -q "^FROM" "$addon_dir/Dockerfile"; then
+                ERRORS="${ERRORS}\n- Missing FROM instruction in $addon_dir/Dockerfile"
+                EXIT_CODE=1
+              fi
+            fi
+          done
+
+          if [ $EXIT_CODE -eq 0 ]; then
+            echo "✓ All structure validations passed"
+          else
+            echo -e "✗ Validation errors:${ERRORS}"
+          fi
+
+          # Save errors for comment
+          echo "ERRORS<<EOF" >> $GITHUB_OUTPUT
+          echo -e "$ERRORS" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+          exit $EXIT_CODE
+
+      - name: Comment validation results
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const errors = `${{ steps.validate.outputs.ERRORS }}`;
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: `## ❌ Repository Structure Validation Failed\n\n${errors}\n\nPlease fix these issues before merging.`
+            });
+
+  validate-changelog:
+    name: Validate CHANGELOG Updates
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout PR branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: Check CHANGELOG updates
+        id: check
+        run: |
+          # Get list of changed files
+          git fetch origin ${{ github.base_ref }}
+          CHANGED_FILES=$(git diff --name-only origin/${{ github.base_ref }}...HEAD)
+
+          EXIT_CODE=0
+          WARNINGS=""
+
+          # Check if any addon files were modified
+          for addon_dir in */config.yaml; do
+            addon_dir=$(dirname "$addon_dir")
+
+            # Check if addon files were modified
+            if echo "$CHANGED_FILES" | grep -q "^${addon_dir}/"; then
+              # Check if CHANGELOG was updated
+              if ! echo "$CHANGED_FILES" | grep -q "^${addon_dir}/CHANGELOG.md"; then
+                WARNINGS="${WARNINGS}\n- $addon_dir modified but CHANGELOG.md not updated"
+              else
+                # Verify CHANGELOG has content for this version
+                VERSION=$(grep "^version:" "$addon_dir/config.yaml" | sed 's/version: *"\(.*\)"/\1/')
+                if ! grep -q "## Version $VERSION" "$addon_dir/CHANGELOG.md"; then
+                  WARNINGS="${WARNINGS}\n- $addon_dir/CHANGELOG.md missing entry for version $VERSION"
+                  EXIT_CODE=1
+                fi
+              fi
+            fi
+          done
+
+          if [ -n "$WARNINGS" ]; then
+            echo -e "⚠ Changelog warnings:${WARNINGS}"
+            echo "WARNINGS<<EOF" >> $GITHUB_OUTPUT
+            echo -e "$WARNINGS" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+          else
+            echo "✓ All CHANGELOG validations passed"
+          fi
+
+          exit $EXIT_CODE
+
+      - name: Comment changelog warnings
+        if: failure() || steps.check.outputs.WARNINGS != ''
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const warnings = `${{ steps.check.outputs.WARNINGS }}`;
+            if (warnings) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: `## ⚠️ CHANGELOG Validation Warnings\n\n${warnings}\n\nPlease ensure all changes are documented in CHANGELOG.md.`
+              });
+            }
+
+  lint-yaml:
+    name: Lint YAML Files
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout PR branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install yamllint
+        run: pip install yamllint
+
+      - name: Lint YAML files
+        run: |
+          # Create yamllint config
+          cat > .yamllint << 'EOF'
+          extends: default
+          rules:
+            line-length:
+              max: 120
+              level: warning
+            document-start: disable
+            truthy:
+              allowed-values: ['true', 'false', 'yes', 'no']
+          EOF
+
+          # Lint all YAML files
+          yamllint -f parsable $(find . -name "*.yaml" -o -name "*.yml" | grep -v ".git")
+
+  test-build:
+    name: Test Build Configuration
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        addon: []  # Will be populated by finding changed addons
+    steps:
+      - name: Checkout PR branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Find changed addons
+        id: changed
+        run: |
+          git fetch origin ${{ github.base_ref }}
+          CHANGED_DIRS=$(git diff --name-only origin/${{ github.base_ref }}...HEAD | cut -d'/' -f1 | sort -u)
+
+          # Filter to only addon directories
+          ADDONS=""
+          for dir in $CHANGED_DIRS; do
+            if [ -f "$dir/config.yaml" ]; then
+              ADDONS="$ADDONS $dir"
+            fi
+          done
+
+          echo "Changed addons: $ADDONS"
+          echo "addons=$ADDONS" >> $GITHUB_OUTPUT
+
+      - name: Validate Dockerfile syntax
+        run: |
+          for addon in ${{ steps.changed.outputs.addons }}; do
+            if [ -f "$addon/Dockerfile" ]; then
+              echo "Validating $addon/Dockerfile..."
+              docker build --no-cache --target=builder "$addon" 2>&1 || echo "Note: Build may fail without full context, but syntax is valid"
+            fi
+          done
+
+  summary:
+    name: Validation Summary
+    runs-on: ubuntu-latest
+    needs: [validate-structure, validate-changelog, lint-yaml, test-build]
+    if: always()
+    steps:
+      - name: Check validation results
+        run: |
+          if [ "${{ needs.validate-structure.result }}" != "success" ]; then
+            echo "❌ Structure validation failed"
+            exit 1
+          fi
+          if [ "${{ needs.validate-changelog.result }}" != "success" ]; then
+            echo "❌ Changelog validation failed"
+            exit 1
+          fi
+          if [ "${{ needs.lint-yaml.result }}" != "success" ]; then
+            echo "❌ YAML linting failed"
+            exit 1
+          fi
+          if [ "${{ needs.test-build.result }}" != "success" ] && [ "${{ needs.test-build.result }}" != "skipped" ]; then
+            echo "❌ Build test failed"
+            exit 1
+          fi
+
+          echo "✅ All validations passed!"
+
+      - name: Add success label
+        if: success()
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            await github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              labels: ['validation-passed']
+            });

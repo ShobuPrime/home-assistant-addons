@@ -1,0 +1,204 @@
+name: Auto-merge PRs
+
+on:
+  pull_request:
+    types: [labeled, unlabeled, synchronize, opened, edited, ready_for_review]
+  pull_request_review:
+    types: [submitted]
+  check_suite:
+    types: [completed]
+  workflow_run:
+    workflows: ["PR Validation"]
+    types: [completed]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  auto-merge:
+    name: Auto-merge PR
+    runs-on: ubuntu-latest
+    # Only run on PRs created by github-actions bot
+    if: |
+      github.event.pull_request.user.login == 'github-actions[bot]' &&
+      contains(github.event.pull_request.labels.*.name, 'automated')
+    steps:
+      - name: Check PR conditions
+        id: check
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const { data: pr } = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number
+            });
+
+            console.log('PR Details:', {
+              number: pr.number,
+              state: pr.state,
+              draft: pr.draft,
+              mergeable: pr.mergeable,
+              mergeable_state: pr.mergeable_state
+            });
+
+            // Check if PR is ready
+            if (pr.state !== 'open') {
+              core.setFailed('PR is not open');
+              return;
+            }
+
+            if (pr.draft) {
+              core.setFailed('PR is a draft');
+              return;
+            }
+
+            // Check for required labels
+            const labels = pr.labels.map(l => l.name);
+            console.log('Labels:', labels);
+
+            if (!labels.includes('automated')) {
+              core.setFailed('Missing "automated" label');
+              return;
+            }
+
+            if (!labels.includes('validation-passed')) {
+              console.log('Waiting for validation to pass...');
+              core.setFailed('Validation not yet passed');
+              return;
+            }
+
+            // Check if any blocking labels are present
+            const blockingLabels = ['do-not-merge', 'needs-review', 'on-hold'];
+            const hasBlockingLabel = labels.some(l => blockingLabels.includes(l));
+            if (hasBlockingLabel) {
+              core.setFailed('PR has blocking label');
+              return;
+            }
+
+            // Get check runs
+            const { data: checkRuns } = await github.rest.checks.listForRef({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              ref: pr.head.sha
+            });
+
+            console.log('Check runs:', checkRuns.check_runs.map(c => ({
+              name: c.name,
+              status: c.status,
+              conclusion: c.conclusion
+            })));
+
+            // Verify all checks have passed
+            const pendingChecks = checkRuns.check_runs.filter(
+              c => c.status !== 'completed' || c.conclusion !== 'success'
+            );
+
+            if (pendingChecks.length > 0) {
+              console.log('Pending/failed checks:', pendingChecks.map(c => c.name));
+              core.setFailed('Not all checks have passed');
+              return;
+            }
+
+            // Get required status checks from branch protection (if any)
+            try {
+              const { data: branch } = await github.rest.repos.getBranch({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                branch: pr.base.ref
+              });
+
+              if (branch.protection?.enabled && branch.protection?.required_status_checks) {
+                const requiredChecks = branch.protection.required_status_checks.contexts || [];
+                console.log('Required checks:', requiredChecks);
+
+                const { data: statuses } = await github.rest.repos.getCombinedStatusForRef({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  ref: pr.head.sha
+                });
+
+                const failedStatuses = statuses.statuses.filter(s => s.state !== 'success');
+                if (failedStatuses.length > 0) {
+                  console.log('Failed statuses:', failedStatuses.map(s => s.context));
+                  core.setFailed('Required status checks have not passed');
+                  return;
+                }
+              }
+            } catch (error) {
+              console.log('No branch protection or unable to fetch:', error.message);
+            }
+
+            console.log('All conditions met - ready to merge');
+            core.setOutput('ready', 'true');
+
+      - name: Enable auto-merge
+        if: steps.check.outputs.ready == 'true'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            try {
+              // Try to enable auto-merge (requires branch protection with required checks)
+              await github.rest.pulls.merge({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: context.issue.number,
+                merge_method: 'squash',
+                commit_title: `${{ github.event.pull_request.title }}`,
+                commit_message: `${{ github.event.pull_request.body }}\n\nAuto-merged by GitHub Actions`
+              });
+
+              console.log('PR merged successfully');
+
+              // Add comment
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: '✅ All validation checks passed. PR has been automatically merged.'
+              });
+            } catch (error) {
+              console.log('Merge failed:', error.message);
+
+              // If direct merge fails, try enabling auto-merge
+              try {
+                await github.rest.pulls.enableAutoMerge({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  pull_number: context.issue.number,
+                  merge_method: 'squash'
+                });
+
+                console.log('Auto-merge enabled');
+
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: context.issue.number,
+                  body: '✅ All validation checks passed. Auto-merge has been enabled.'
+                });
+              } catch (autoMergeError) {
+                core.setFailed(`Unable to merge or enable auto-merge: ${autoMergeError.message}`);
+              }
+            }
+
+  notify-on-failure:
+    name: Notify on Auto-merge Failure
+    runs-on: ubuntu-latest
+    needs: auto-merge
+    if: failure()
+    steps:
+      - name: Comment on PR
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: `⚠️ Auto-merge failed. Please check the workflow logs and merge manually if appropriate.\n\nTo prevent auto-merge in the future, add the \`do-not-merge\` label.`
+            });

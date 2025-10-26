@@ -110,17 +110,23 @@ update_files() {
         log "${GREEN}✓${NC} Updated Dockerfile"
     fi
 
-    # Update README.md
+    # Update README.md - only update specific version references, not all occurrences
     if [ -f "$addon_path/README.md" ]; then
-        sed -i "s/Portainer [0-9.]*/Portainer $new_version/g" "$addon_path/README.md"
-        sed -i "s/version [0-9.]*$/version $new_version/g" "$addon_path/README.md"
+        # Update "Currently running Portainer X.X.X" type statements
+        sed -i "s/Currently running Portainer [0-9.]*/Currently running Portainer $new_version/g" "$addon_path/README.md"
+        # Update "running version X.X.X" type statements
+        sed -i "s/running version [0-9.]*/running version $new_version/g" "$addon_path/README.md"
+        # Update version badges/shields if present
+        sed -i "s/version-[0-9.]*-/version-$new_version-/g" "$addon_path/README.md"
         log "${GREEN}✓${NC} Updated README.md"
     fi
 
-    # Update DOCS.md
+    # Update DOCS.md - only update specific version references, not section headers
     if [ -f "$addon_path/DOCS.md" ]; then
-        sed -i "s/version [0-9.]*$/version $new_version/g" "$addon_path/DOCS.md"
-        sed -i "s/Portainer [0-9.]*/Portainer $new_version/g" "$addon_path/DOCS.md"
+        # Update "running version X.X.X" type statements
+        sed -i "s/running version [0-9.]*/running version $new_version/g" "$addon_path/DOCS.md"
+        # Update "Currently running Portainer X.X.X" type statements
+        sed -i "s/Currently running Portainer [0-9.]*/Currently running Portainer $new_version/g" "$addon_path/DOCS.md"
         log "${GREEN}✓${NC} Updated DOCS.md"
     fi
 }

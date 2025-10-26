@@ -101,3 +101,4 @@ jobs:
             portainer
             sts
             update
+          draft: false

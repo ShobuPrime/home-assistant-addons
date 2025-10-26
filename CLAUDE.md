@@ -48,6 +48,43 @@ The repository uses the `home-assistant/builder` action for automated addon buil
 
 Without proper `--docker-hub` and `--image` flags, the builder will generate invalid image tags like `/:version` instead of `username/image:version`.
 
+## Automated PR Management
+
+The repository includes comprehensive automation for managing pull requests:
+
+### Automatic Version Updates
+- Daily checks for new Portainer releases (LTS and STS)
+- Automatically creates PRs with version updates and changelogs
+- Updates documentation with conservative regex patterns to avoid breaking section headers
+
+### PR Validation
+- Validates repository structure (required files, config format)
+- Checks CHANGELOG.md updates
+- Lints YAML files
+- Tests build configurations
+- Adds `validation-passed` label on success
+
+### Auto-merge
+- Automatically merges PRs created by github-actions[bot] that pass all validations
+- Requires `automated` and `validation-passed` labels
+- Blocked by `do-not-merge`, `needs-review`, or `on-hold` labels
+- Uses squash merge method
+
+### Managing Auto-merge
+Use the helper script to control auto-merge behavior:
+```bash
+# Check PR auto-merge status
+.github/scripts/manage-automerge.sh <pr-number> status
+
+# Block auto-merge
+.github/scripts/manage-automerge.sh <pr-number> block
+
+# Unblock auto-merge
+.github/scripts/manage-automerge.sh <pr-number> unblock
+```
+
+See [`.github/AUTOMATION.md`](.github/AUTOMATION.md) for complete documentation.
+
 ## Git Commit Guidelines
 
 - **Always sign commits**: All commits must be signed with GPG/SSH signatures
