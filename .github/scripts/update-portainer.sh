@@ -1,6 +1,6 @@
 #!/bin/bash
 # Script to check and update Portainer version
-# Supports both LTS (even minor) and STS (odd minor) releases
+# Supports both LTS and STS releases (detected by release name, not version pattern)
 
 set -e
 

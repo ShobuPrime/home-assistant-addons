@@ -23,7 +23,7 @@ To use these add-ons in your Home Assistant installation:
 This repository contains the following add-ons:
 
 ### Portainer EE (LTS)
-Manage your Docker environment with Portainer Enterprise Edition (Long Term Support). This version uses LTS releases with odd minor version numbers (2.21.x, 2.23.x, 2.27.x, 2.33.x, etc.) for maximum stability.
+Manage your Docker environment with Portainer Enterprise Edition (Long Term Support). This version tracks Portainer's LTS releases for maximum stability and extended support.
 
 - Full Docker management interface
 - SSL/TLS support using Home Assistant certificates
@@ -31,7 +31,7 @@ Manage your Docker environment with Portainer Enterprise Edition (Long Term Supp
 - Automatic version updates via GitHub Actions
 
 ### Portainer EE (STS)
-Manage your Docker environment with Portainer Enterprise Edition (Short Term Support). This version uses STS releases with even minor version numbers (2.20.x, 2.22.x, 2.24.x, 2.32.x, 2.34.x, etc.) for the latest features.
+Manage your Docker environment with Portainer Enterprise Edition (Short Term Support). This version tracks Portainer's STS releases for the latest features and updates.
 
 - Full Docker management interface
 - SSL/TLS support using Home Assistant certificates

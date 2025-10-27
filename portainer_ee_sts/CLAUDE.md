@@ -33,10 +33,10 @@ docker run --rm -it -p 8000:8000 -p 9000:9000 -p 9443:9443 -v /var/run/docker.so
 
 Portainer uses a semantic versioning scheme with two release tracks:
 
-- **LTS (Long Term Support)**: Even minor version numbers (2.20.x, 2.22.x, 2.24.x, 2.26.x, 2.28.x, 2.30.x, 2.32.x, 2.34.x, etc.)
-- **STS (Short Term Support)**: Odd minor version numbers (2.21.x, 2.23.x, 2.25.x, 2.27.x, 2.29.x, 2.31.x, 2.33.x, etc.)
+- **LTS (Long Term Support)**: Stable releases with extended support and maintenance
+- **STS (Short Term Support)**: Feature releases with the latest updates
 
-The update script (`update-portainer-version.sh`) automatically filters for LTS releases using the regex pattern `^2\.[0-9]*[02468]\.[0-9]+$` to ensure only stable, long-term supported versions are installed.
+The update script filters for STS releases by checking the GitHub release name for "STS" designation. This ensures only the latest feature releases are installed, regardless of version number patterns.
 
 ## Architecture and Key Components
 
@@ -161,25 +161,24 @@ The add-on includes a Home Assistant integration package for automatic update de
 3. Update the add-on in Home Assistant Supervisor
 4. Restart the add-on
 
-### Issue: Update Script Selects Wrong Version (STS Instead of LTS)
+### Issue: Update Script Selects Wrong Version Type
 
 **Symptoms:**
-- Script updates to odd minor version (2.27.x, 2.29.x, 2.31.x, 2.33.x)
-- Expected LTS version but got STS
+- Script updates to wrong release type (STS when expecting LTS, or vice versa)
 
-**Cause:** This should not happen - the script explicitly filters for LTS versions
+**Cause:** This should not happen - the script explicitly filters by release name designation
 
 **Verification:**
 ```bash
-# Check what the script considers latest LTS
+# Check what the script considers latest STS
 ./update-portainer-version.sh --check-only
 
-# Manually verify LTS releases
+# Manually verify STS releases
 curl -s https://api.github.com/repos/portainer/portainer/releases | \
-  jq -r '.[] | select(.tag_name | test("^2\\.[0-9]*[02468]\\.[0-9]+$")) | select(.prerelease == false) | .tag_name' | head -5
+  jq -r '.[] | select(.prerelease == false) | select(.name | test("STS"; "i")) | .tag_name' | head -5
 ```
 
-**Note:** If you're on an STS version (like 2.27.9), the update script will correctly update you to the latest LTS version (even minor number).
+**Note:** The script determines release type by checking for "STS" or "LTS" in the GitHub release name, not by version number patterns.
 
 ### Issue: Home Assistant Not Detecting Add-on Updates Automatically
 

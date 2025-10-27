@@ -12,7 +12,7 @@ Manage your Docker environment with ease using Portainer Enterprise Edition (Lon
 
 Portainer is a lightweight management UI which allows you to easily manage your Docker environments. This add-on brings Portainer EE LTS (Long Term Support) to Home Assistant, integrating it seamlessly with the sidebar and providing easy access to all Docker management features.
 
-**Note**: This is the LTS version with odd minor version numbers (2.21.x, 2.23.x, 2.27.x, 2.33.x, etc.). For the latest features with STS (Short Term Support), see the `portainer_ee_sts` addon.
+**Note**: This is the LTS version which tracks Portainer's Long Term Support releases for maximum stability and extended support. For the latest features with STS (Short Term Support), see the `portainer_ee_sts` addon.
 
 ## Features
 
