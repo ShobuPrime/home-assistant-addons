@@ -156,5 +156,5 @@ For manual updates and more details, see [UPDATE_GUIDE.md](UPDATE_GUIDE.md).
 
 ## Version
 
-Currently running Portainer 2.34.0 STS
+Currently running Portainer 2.35.0 STS
 
