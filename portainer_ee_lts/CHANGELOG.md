@@ -1,5 +1,42 @@
 # Changelog
 
+## Version 2.33.3 (2025-11-01)
+
+# Release 2.33.3 LTS
+
+## Known issues
+
+- On Async Edge environments, an invalid update schedule date can be displayed when browsing a snapshot
+
+### Known issues with Podman support
+
+- Podman environments aren't supported by auto-onboarding script
+- It's not possible to add Podman environments via socket, when running a Portainer server on Docker (and vice versa)
+- Support for only CentOS 9, Podman 5 rootful
+
+## Changes
+
+- Improved stability by attempting to compact using a read-only database
+- Fixed an issue where WebSocket upgrade failed with Portainer generated `kubeconfig`
+- Fixed an issue where a memory leak occured during Kubernetes stack auto redeployment
+- Fixed missing dependency versions displayed in the popup
+- Fixed an issue where adding a team access to a namespace threw a panic error
+- Fixed typos in Content-Security-Policy
+- Resolved CVE-2025-62725
+
+## Deprecated and removed features
+
+**Deprecated features**
+
+- None
+
+**Removed features**
+
+- N
+
+---
+
+
 ## Version 2.34.0
 
 ### Add-on Changes
