@@ -1,5 +1,34 @@
 # Changelog
 
+## Version 2.36.0 (2025-11-28)
+
+## Known issues
+
+- On Async Edge environments, an invalid update schedule date can be displayed when browsing a snapshot
+
+### Known issues with Podman support
+
+- Podman environments aren't supported by auto-onboarding script
+- It's not possible to add Podman environments via socket, when running a Portainer server on Docker (and vice versa)
+- Support for only CentOS 9, Podman 5 rootful
+
+## Changes
+
+- Fixed local development build scripts for community contributors with Apple M series chips
+- Improved ECR session management in the Agent
+- Added support for Docker v29
+- Improved the consistency for GitOps across different scenarios
+- Fixed the External label for Kubernetes environments
+- Fixed namespace selection in the registry access page
+- Improve the registry credential handling in compose files
+- Fixed CVEs in the password reset helper
+- Fixed the Prune services toggle for Swarm
+- Added a --data-path flag to the password reset helper
+- Fixed oversized custom ic
+
+---
+
+
 ## Version 2.35.0 (2025-10-27)
 
 ## Known issues
