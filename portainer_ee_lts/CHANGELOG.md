@@ -1,5 +1,34 @@
 # Changelog
 
+## Version 2.33.5 (2025-11-28)
+
+## Known issues
+
+- On Async Edge environments, an invalid update schedule date can be displayed when browsing a snapshot
+
+### Known issues with Podman support
+
+- Podman environments aren't supported by auto-onboarding script
+- It's not possible to add Podman environments via socket, when running a Portainer server on Docker (and vice versa)
+- Support for only CentOS 9, Podman 5 rootful
+
+## Changes
+- Added support for Docker v29
+
+# Breaking change
+- Removed the optional raw snapshot response from some endpoint requests 
+
+## Deprecated and removed features
+
+**Deprecated features**
+- None
+
+**Removed features**
+- None
+
+---
+
+
 ## Version 2.33.3 (2025-11-01)
 
 # Release 2.33.3 LTS
