@@ -1,5 +1,28 @@
 # Changelog
 
+## Version 2.33.6 (2025-12-18)
+
+## Known issues
+
+- On Async Edge environments, an invalid update schedule date can be displayed when browsing a snapshot
+
+### Known issues with Podman support
+
+- Podman environments aren't supported by auto-onboarding script
+- It's not possible to add Podman environments via socket, when running a Portainer server on Docker (and vice versa)
+- Support for only CentOS 9, Podman 5 rootful
+
+## Changes
+
+- Fixed an issue where a standard stack could not pull private images from a private registry during a GitOps update (polling/webhook) when "Re-pull image" was enabled and a relative path was configured
+- Fixed an issue where starting a Stack failed when a private image referenced by the Stack had been removed from the environment
+- Fixed an issue where empty Docker snapshot could cause issues
+- Fixed an issue where Duplicate/Edit Container adds persistent MAC address causing Network issues
+- Fixed an issue where Docker Compose configs were not injected into containers for st
+
+---
+
+
 ## Version 2.33.5 (2025-11-28)
 
 ## Known issues
