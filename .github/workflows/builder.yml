@@ -113,4 +113,5 @@ jobs:
             --target /data/${{ matrix.addon }} \
             --docker-hub shobuprime \
             --image ${{ matrix.addon }} \
-            --all
+            --amd64 \
+            --aarch64
