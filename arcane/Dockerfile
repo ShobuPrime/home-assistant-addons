@@ -13,6 +13,7 @@ RUN \
         openssl
 
 # Download and install Arcane
+# Release assets are raw binaries named: arcane_linux_amd64, arcane_linux_arm64
 RUN \
     mkdir -p /opt/arcane \
     && ARCH="$(uname -m)" \
@@ -25,12 +26,9 @@ RUN \
         exit 1; \
     fi \
     && echo "Downloading Arcane v${ARCANE_VERSION} for ${ARCANE_ARCH}..." \
-    && curl -L -f -S -o /tmp/arcane.tar.gz \
-        "https://github.com/getarcaneapp/arcane/releases/download/v${ARCANE_VERSION}/arcane_Linux_${ARCANE_ARCH}.tar.gz" \
-    && echo "Download complete. File size:" && ls -lh /tmp/arcane.tar.gz \
-    && echo "Extracting Arcane..." \
-    && tar -xzf /tmp/arcane.tar.gz -C /opt/arcane \
-    && rm /tmp/arcane.tar.gz \
+    && curl -L -f -S -o /opt/arcane/arcane \
+        "https://github.com/getarcaneapp/arcane/releases/download/v${ARCANE_VERSION}/arcane_linux_${ARCANE_ARCH}" \
+    && echo "Download complete. File size:" && ls -lh /opt/arcane/arcane \
     && chmod +x /opt/arcane/arcane \
     && echo "Arcane installed successfully"
 
