@@ -17,35 +17,69 @@ jobs:
     outputs:
       changed_addons: ${{ steps.changed_addons.outputs.addons }}
       changed: ${{ steps.changed_addons.outputs.changed }}
+      all_addons: ${{ steps.all_addons.outputs.addons }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Discover all add-ons
+        id: all_addons
+        run: |
+          # Dynamically find all addon directories (those with config.yaml)
+          declare -a all_addons
+          for config in */config.yaml; do
+            addon_dir=$(dirname "$config")
+            # Skip hidden directories and non-addon directories
+            if [[ ! "$addon_dir" =~ ^\. ]]; then
+              all_addons+=("$addon_dir")
+              echo "Found addon: $addon_dir"
+            fi
+          done
+
+          # Create JSON array of all addons
+          addons_json=$(printf '%s\n' "${all_addons[@]}" | jq -R . | jq -sc '.')
+          echo "addons=${addons_json}" >> "$GITHUB_OUTPUT"
+          echo "All addons: ${addons_json}"
 
       - name: Get changed files
         id: changed_files
         uses: tj-actions/changed-files@v41
-        with:
-          files: |
-            portainer_ee_lts/**
-            portainer_ee_sts/**
-            dockge/**
 
       - name: Find changed add-ons
         id: changed_addons
         run: |
           declare -a changed_addons
 
+          # Get all addon directories dynamically
+          declare -a all_addon_dirs
+          for config in */config.yaml; do
+            addon_dir=$(dirname "$config")
+            if [[ ! "$addon_dir" =~ ^\. ]]; then
+              all_addon_dirs+=("$addon_dir")
+            fi
+          done
+
           # Check if any addon files changed
           if [[ "${{ steps.changed_files.outputs.any_changed }}" == "true" ]]; then
-            for addon in portainer_ee_lts portainer_ee_sts dockge; do
-              if [[ "${{ steps.changed_files.outputs.all_changed_files }}" =~ $addon ]]; then
-                changed_addons+=("\"${addon}\"");
+            changed_files="${{ steps.changed_files.outputs.all_changed_files }}"
+
+            for addon in "${all_addon_dirs[@]}"; do
+              # Check if any file in this addon directory changed
+              if echo "$changed_files" | grep -q "^${addon}/\|${addon}/"; then
+                changed_addons+=("\"${addon}\"")
+                echo "Addon changed: $addon"
               fi
             done
-          else
-            # If no changes detected (e.g., initial commit), build all addons
-            echo "No changed files detected, building all addons"
-            changed_addons=("\"portainer_ee_lts\"" "\"portainer_ee_sts\"" "\"dockge\"")
+          fi
+
+          # If no changes detected (e.g., initial commit or workflow changes), build all addons
+          if [[ ${#changed_addons[@]} -eq 0 ]]; then
+            echo "No addon-specific changes detected, building all addons"
+            for addon in "${all_addon_dirs[@]}"; do
+              changed_addons+=("\"${addon}\"")
+            done
           fi
 
           changed=$(echo ${changed_addons[@]} | jq -sc '.')
@@ -56,6 +90,8 @@ jobs:
           else
             echo "changed=false" >> "$GITHUB_OUTPUT"
           fi
+
+          echo "Changed addons: ${changed}"
 
   build:
     needs: init
@@ -77,4 +113,5 @@ jobs:
             --target /data/${{ matrix.addon }} \
             --docker-hub shobuprime \
             --image ${{ matrix.addon }} \
-            --all
+            --amd64 \
+            --aarch64
