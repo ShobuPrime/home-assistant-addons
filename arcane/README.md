@@ -83,4 +83,4 @@ Got questions or found a bug? Please open an issue on the GitHub repository.
 
 ## Version
 
-Currently running Arcane 1.11.3
+Currently running Arcane 1.12.0
