@@ -2,7 +2,7 @@ ARG BUILD_FROM
 FROM $BUILD_FROM
 
 # Build arguments for version
-ARG ARCANE_VERSION=1.12.2
+ARG ARCANE_VERSION=1.13.0
 
 # Install requirements
 RUN \

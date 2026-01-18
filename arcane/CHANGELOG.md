@@ -1,5 +1,26 @@
 # Changelog
 
+## Version 1.13.0 (2026-01-18)
+
+> [!IMPORTANT]
+> This updated patches/removes the attack surface for GHSA-gjqq-6r35-w3r8. Credit to @DenizParlak for reporting this vulnerability.
+
+### Backend - New features
+
+* allow sensitive env variables to be read from _FILE ([#1423](https://github.com/getarcaneapp/arcane/pull/1423) by @kmendell)
+* add JSON parsing and structured log display functionality ([#1463](https://github.com/getarcaneapp/arcane/pull/1463) by @FusionStreak)
+* use shoutrrr for notifications (apprise deprecated) ([#1424](https://github.com/getarcaneapp/arcane/pull/1424) by @kmendell)
+* bulk actions for containers and projects ([#1466](https://github.com/getarcaneapp/arcane/pull/1466) by @kmendell)
+* auto-prune/prune scheduler job ([#1467](https://github.com/getarcaneapp/arcane/pull/1467) by @kmendell)
+* project status filter selector ([#1484](https://github.com/getarcaneapp/arcane/pull/1484) by @kmendell)
+
+### Backend - Bug fixes
+
+* add option for ssh host key verification and known hosts ([#144
+
+---
+
+
 ## Version 1.12.2 (2026-01-14)
 
 > [!IMPORTANT]
