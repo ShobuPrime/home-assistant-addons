@@ -1,5 +1,36 @@
 # Changelog
 
+## Version 2.33.7 (2026-02-11)
+
+## Known issues
+
+- On Async Edge environments, an invalid update schedule date can be displayed when browsing a snapshot
+
+### Known issues with Podman support
+
+- Podman environments aren't supported by auto-onboarding script
+- It's not possible to add Podman environments via socket, when running a Portainer server on Docker (and vice versa)
+- Support for only CentOS 9, Podman 5 rootful
+
+## Changes
+
+- Fixed an issue where clicking the Update stack button would do nothing
+- Fixed an issue that would cause the Containers page to not load
+- Fixed an error when updating Edge Stacks
+- Fixed a panic in Edge Group creation
+- Fixed a deadlock in the auto onboarding
+- Fixed a problem that prevented the loading of the Containers page
+- Fixed a problem in Edge Stacks and GitOps when the entry file name was not at the repository root
+- Upgraded compose to v2.40.3 to fix a nil pointer error
+- Resolved the following CVEs:
+	- CVE-2025-61726
+	- CVE-2025-68121
+
+## Deprecated and 
+
+---
+
+
 ## Version 2.33.6 (2025-12-18)
 
 ## Known issues
