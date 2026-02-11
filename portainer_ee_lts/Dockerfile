@@ -2,7 +2,7 @@ ARG BUILD_FROM
 FROM $BUILD_FROM
 
 # Build arguments for version
-ARG PORTAINER_VERSION=2.33.6
+ARG PORTAINER_VERSION=2.33.7
 
 # Install requirements
 RUN \
