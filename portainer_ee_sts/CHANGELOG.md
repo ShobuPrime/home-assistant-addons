@@ -1,5 +1,33 @@
 # Changelog
 
+## Version 2.38.0 (2026-02-11)
+
+## Known issues
+
+- On Async Edge environments, an invalid update schedule date can be displayed when browsing a snapshot
+
+### Known issues with Podman support
+
+- Podman environments aren't supported by auto-onboarding script
+- It's not possible to add Podman environments via socket, when running a Portainer server on Docker (and vice versa)
+- Support for only CentOS 9, Podman 5 rootful
+
+## Changes
+
+- Fixed an issue where starting Stack was failed when the private image referenced by the stack was removed from the environment
+- Fixed an issue where deploying a Stack in Kubernetes caused a memory leak
+- Fixed a UI issue when updating edge stacks
+- Changed the Docker security settings to safer default values
+- Fixed a panic in Edge Group creation
+- Fixed quote handling in TLS CLI flags
+- Fixed error in GitOps while updating Stacks
+- Fixed a problem that would cause for the Containers page to not load
+- Bumped up the max Docker API version in the proxy
+- Fixed a proble
+
+---
+
+
 ## Version 2.37.0 (2025-12-12)
 
 ## Known issues
