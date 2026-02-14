@@ -2,11 +2,13 @@ ARG BUILD_FROM
 FROM $BUILD_FROM
 
 # Build arguments for version
-ARG PORTAINER_VERSION=2.38.0
+ARG PORTAINER_VERSION=2.38.1
 
 # Install requirements
+# Upgrade first to resolve base image package version mismatches (e.g. libcrypto3/libssl3)
 RUN \
-    apk add --no-cache \
+    apk upgrade --no-cache \
+    && apk add --no-cache \
         ca-certificates \
         curl \
         jq

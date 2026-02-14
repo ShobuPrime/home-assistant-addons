@@ -126,8 +126,9 @@ jobs:
                 WARNINGS="${WARNINGS}\n- $addon_dir modified but CHANGELOG.md not updated"
               else
                 # Verify CHANGELOG has content for this version
+                # Support both "## Version X.Y.Z" and "## [X.Y.Z]" formats
                 VERSION=$(grep "^version:" "$addon_dir/config.yaml" | sed 's/version: *"\(.*\)"/\1/')
-                if ! grep -q "## Version $VERSION" "$addon_dir/CHANGELOG.md"; then
+                if ! grep -qE "## (Version )?(\[)?${VERSION}(\])?" "$addon_dir/CHANGELOG.md"; then
                   WARNINGS="${WARNINGS}\n- $addon_dir/CHANGELOG.md missing entry for version $VERSION"
                   EXIT_CODE=1
                 fi
@@ -196,80 +197,81 @@ jobs:
           # Lint all YAML files
           yamllint -f parsable $(find . -name "*.yaml" -o -name "*.yml" | grep -v ".git")
 
-  test-build:
-    name: Test Build Configuration
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        addon: []  # Will be populated by finding changed addons
-    steps:
-      - name: Checkout PR branch
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.pull_request.head.sha }}
-
-      - name: Find changed addons
-        id: changed
-        run: |
-          git fetch origin ${{ github.base_ref }}
-          CHANGED_DIRS=$(git diff --name-only origin/${{ github.base_ref }}...HEAD | cut -d'/' -f1 | sort -u)
-
-          # Filter to only addon directories
-          ADDONS=""
-          for dir in $CHANGED_DIRS; do
-            if [ -f "$dir/config.yaml" ]; then
-              ADDONS="$ADDONS $dir"
-            fi
-          done
-
-          echo "Changed addons: $ADDONS"
-          echo "addons=$ADDONS" >> $GITHUB_OUTPUT
-
-      - name: Validate Dockerfile syntax
-        run: |
-          for addon in ${{ steps.changed.outputs.addons }}; do
-            if [ -f "$addon/Dockerfile" ]; then
-              echo "Validating $addon/Dockerfile..."
-              docker build --no-cache --target=builder "$addon" 2>&1 || echo "Note: Build may fail without full context, but syntax is valid"
-            fi
-          done
-
   summary:
     name: Validation Summary
     runs-on: ubuntu-latest
-    needs: [validate-structure, validate-changelog, lint-yaml, test-build]
+    needs: [validate-structure, validate-changelog, lint-yaml]
     if: always()
     steps:
       - name: Check validation results
+        id: results
         run: |
+          FAILED=false
+
           if [ "${{ needs.validate-structure.result }}" != "success" ]; then
             echo "❌ Structure validation failed"
-            exit 1
+            FAILED=true
           fi
           if [ "${{ needs.validate-changelog.result }}" != "success" ]; then
             echo "❌ Changelog validation failed"
-            exit 1
+            FAILED=true
           fi
           if [ "${{ needs.lint-yaml.result }}" != "success" ]; then
             echo "❌ YAML linting failed"
-            exit 1
+            FAILED=true
           fi
-          if [ "${{ needs.test-build.result }}" != "success" ] && [ "${{ needs.test-build.result }}" != "skipped" ]; then
-            echo "❌ Build test failed"
+
+          if [ "$FAILED" = "true" ]; then
+            echo "passed=false" >> $GITHUB_OUTPUT
             exit 1
           fi
 
           echo "✅ All validations passed!"
+          echo "passed=true" >> $GITHUB_OUTPUT
 
       - name: Add success label
-        if: success()
+        if: steps.results.outputs.passed == 'true'
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
+            // Remove validation-passed label if it exists (to re-add fresh)
+            try {
+              await github.rest.issues.removeLabel({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                name: 'validation-passed'
+              });
+            } catch (e) {
+              // Label might not exist, that's fine
+            }
+
+            // Add the label
             await github.rest.issues.addLabels({
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: context.issue.number,
               labels: ['validation-passed']
             });
+
+            console.log('Added validation-passed label');
+
+      - name: Remove success label on failure
+        if: steps.results.outputs.passed != 'true'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            try {
+              await github.rest.issues.removeLabel({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                name: 'validation-passed'
+              });
+              console.log('Removed validation-passed label');
+            } catch (e) {
+              // Label might not exist, that's fine
+              console.log('validation-passed label not present');
+            }

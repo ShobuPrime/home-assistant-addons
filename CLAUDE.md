@@ -53,14 +53,20 @@ Without proper `--docker-hub` and `--image` flags, the builder will generate inv
 The repository includes comprehensive automation for managing pull requests:
 
 ### Automatic Version Updates
-- Daily checks for new Portainer releases (LTS and STS)
+- Daily checks for new Portainer releases (LTS and STS), Arcane, and Dockhand
 - Automatically creates PRs with version updates and changelogs
-- **IMPORTANT:** Version detection is based on GitHub release **names** containing "LTS" or "STS"
+- **IMPORTANT:** Portainer version detection is based on GitHub release **names** containing "LTS" or "STS"
   - Do NOT use version number patterns (odd/even) - Portainer does not follow a consistent mathematical pattern
   - The script filters releases by searching for "LTS" or "STS" in the release name via GitHub API
 - Updates documentation with conservative regex patterns to avoid breaking section headers
   - Only updates "Currently running Portainer X.X.X" and similar specific version references
   - Does NOT update section headers like "Portainer 2.33+ Ingress Compatibility"
+
+### Automatic Base Image Updates
+- Daily checks for new `ghcr.io/hassio-addons/base` releases from `hassio-addons/app-base`
+- Updates all addon `build.yaml` files and Dockerfiles with inline `BUILD_FROM` defaults
+- **Major version bumps** automatically get a `needs-review` label to prevent auto-merge (may contain breaking changes like architecture drops)
+- The base image only supports **aarch64 and amd64** architectures (armhf/armv7/i386 dropped in v19.0.0)
 
 ### PR Validation
 - Validates repository structure (required files, config format)
@@ -97,6 +103,12 @@ See [`.github/AUTOMATION.md`](.github/AUTOMATION.md) for complete documentation.
 - Use `git commit -S` for GPG signing or ensure `commit.gpgsign` is configured
 - For SSH signing, ensure `gpg.format` is set to `ssh` and `user.signingkey` points to your SSH key
 - **Never add Claude Code attribution**: Do not include "Generated with Claude Code" or "Co-Authored-By: Claude" lines in commits
+
+## Dockerfile Best Practices
+
+- **Always run `apk upgrade --no-cache` before `apk add`** in Dockerfiles to resolve base image package version mismatches (e.g. libcrypto3/libssl3 conflicts with openssl)
+- **Provide a default for `ARG BUILD_FROM`** (e.g. `ARG BUILD_FROM=ghcr.io/hassio-addons/base:20.0.1`) to silence Docker's `InvalidDefaultArgInFrom` warning
+- **Architecture support**: All addons support only `aarch64` and `amd64` (hassio-addons base v19+ dropped armhf/armv7/i386)
 
 ## Notes
 

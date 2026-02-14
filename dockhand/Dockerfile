@@ -1,26 +1,37 @@
+# Global ARGs must be declared before any FROM
+ARG DOCKHAND_VERSION=1.0.17
 ARG BUILD_FROM
-FROM louislam/dockge:1.5.0 as dockge
 
-FROM $BUILD_FROM
+# Stage 1: Extract Dockhand from official image
+# Dockhand publishes versioned tags as fnsys/dockhand:vX.Y.Z
+FROM fnsys/dockhand:v${DOCKHAND_VERSION} AS dockhand-source
 
-# Build arguments for version
-ARG DOCKGE_VERSION=1.5.0
+# Stage 2: Build final image
+FROM ${BUILD_FROM}
 
-# Install requirements
+# Re-declare ARGs needed in this stage
+ARG DOCKHAND_VERSION
+
+# Install runtime requirements
 # Upgrade first to resolve base image package version mismatches (e.g. libcrypto3/libssl3)
 RUN \
     apk upgrade --no-cache \
     && apk add --no-cache \
-        bash \
         ca-certificates \
         curl \
         jq \
+        docker-cli \
         nodejs \
-        npm
+        sqlite \
+        git \
+        openssh-client \
+        tini
 
-# Copy Dockge from official image
-COPY --from=dockge /app /app
-WORKDIR /app
+# Copy Dockhand application from source image
+COPY --from=dockhand-source /app /opt/dockhand
+
+# Create required directories
+RUN mkdir -p /opt/dockhand/data /opt/dockhand/data/db /opt/dockhand/data/stacks
 
 # Copy root filesystem
 COPY rootfs /
@@ -46,16 +57,16 @@ LABEL \
     io.hass.arch="${BUILD_ARCH}" \
     io.hass.type="addon" \
     io.hass.version=${BUILD_VERSION} \
-    maintainer="Dockge for Home Assistant" \
-    dockge.version="${DOCKGE_VERSION}" \
+    maintainer="Dockhand for Home Assistant" \
+    dockhand.version="${DOCKHAND_VERSION}" \
     org.opencontainers.image.title="${BUILD_NAME}" \
     org.opencontainers.image.description="${BUILD_DESCRIPTION}" \
     org.opencontainers.image.vendor="Home Assistant Add-ons" \
-    org.opencontainers.image.authors="Dockge for Home Assistant" \
-    org.opencontainers.image.licenses="MIT" \
-    org.opencontainers.image.url="https://github.com/louislam/dockge" \
-    org.opencontainers.image.source="https://github.com/louislam/dockge" \
-    org.opencontainers.image.documentation="https://github.com/louislam/dockge" \
+    org.opencontainers.image.authors="Dockhand for Home Assistant" \
+    org.opencontainers.image.licenses="BSL-1.1" \
+    org.opencontainers.image.url="https://dockhand.pro" \
+    org.opencontainers.image.source="https://github.com/Finsys/dockhand" \
+    org.opencontainers.image.documentation="https://dockhand.pro/manual" \
     org.opencontainers.image.created=${BUILD_DATE} \
     org.opencontainers.image.revision=${BUILD_REF} \
     org.opencontainers.image.version=${BUILD_VERSION}

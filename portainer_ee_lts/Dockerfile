@@ -5,8 +5,10 @@ FROM $BUILD_FROM
 ARG PORTAINER_VERSION=2.33.7
 
 # Install requirements
+# Upgrade first to resolve base image package version mismatches (e.g. libcrypto3/libssl3)
 RUN \
-    apk add --no-cache \
+    apk upgrade --no-cache \
+    && apk add --no-cache \
         ca-certificates \
         curl \
         jq

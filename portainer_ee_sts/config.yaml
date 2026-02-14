@@ -1,6 +1,6 @@
 name: "Portainer EE (STS)"
 description: "Manage your Docker environment with Portainer Enterprise Edition (Short Term Support)"
-version: "2.38.0"
+version: "2.38.1"
 slug: "portainer_ee_sts"
 init: false
 ingress: true
@@ -11,9 +11,6 @@ panel_title: Docker
 arch:
   - aarch64
   - amd64
-  - armhf
-  - armv7
-  - i386
 startup: services
 boot: auto
 watchdog: tcp://[HOST]:[PORT:9000]/api/status

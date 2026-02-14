@@ -1,12 +1,14 @@
-ARG BUILD_FROM
+ARG BUILD_FROM=ghcr.io/hassio-addons/base:20.0.1
 FROM $BUILD_FROM
 
 # Build arguments for version
-ARG ARCANE_VERSION=1.14.1
+ARG ARCANE_VERSION=1.15.0
 
 # Install requirements
+# Upgrade first to resolve base image package version mismatches (e.g. libcrypto3/libssl3)
 RUN \
-    apk add --no-cache \
+    apk upgrade --no-cache \
+    && apk add --no-cache \
         ca-certificates \
         curl \
         jq \
