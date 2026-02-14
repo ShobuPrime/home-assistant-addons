@@ -1,5 +1,23 @@
 # Changelog
 
+## Version 1.15.0 (2026-02-14)
+
+
+### New features
+
+* sync .env files from git repositories ([#1632](https://github.com/getarcaneapp/arcane/pull/1632) by @Icehunter)
+* updated table UX, additional 'all' rows option ([#1547](https://github.com/getarcaneapp/arcane/pull/1547) by @cabaucom376)
+* container image vulnerability scanning ([#1657](https://github.com/getarcaneapp/arcane/pull/1657) by @kmendell)
+* implement container exclusion and prune notifications([#1635](https://github.com/getarcaneapp/arcane/pull/1635) by @spupuz)
+* allow configurable LISTEN address ([#1685](https://github.com/getarcaneapp/arcane/pull/1685) by @kmendell)
+* add support for Matrix notifications ([#1679](https://github.com/getarcaneapp/arcane/pull/1679) by @singularity0821)
+* inline container exclusion list ([#1693](https://github.com/getarcaneapp/arcane/pull/1693) by @spupuz)
+* auto-login for specific use-cases (via buildables) ([#1556](https://github.com/getarcaneapp/arcane/pull/1556) by @Nightbr)
+* show projects and containers used by image
+
+---
+
+
 ## Version 1.14.1 (2026-02-11)
 
 
