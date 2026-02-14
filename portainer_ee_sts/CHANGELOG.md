@@ -1,5 +1,38 @@
 # Changelog
 
+## Version 2.38.1 (2026-02-14)
+
+## Known issues
+
+- On Async Edge environments, an invalid update schedule date can be displayed when browsing a snapshot
+
+### Known issues with Podman support
+
+- Podman environments aren't supported by auto-onboarding script
+- It's not possible to add Podman environments via socket, when running a Portainer server on Docker (and vice versa)
+- Support for only CentOS 9, Podman 5 rootful
+
+## Changes
+
+- Fixed an issue around changing an environment group for Kubernetes standard agent within the environment details view 
+- Fixed an issue where local environments using Docker would have their protocol removed
+- Improved the namespace dropdown list to be sorted alphabetically by default
+- Resolved the following CVEs:
+	- CVE-2025-61726
+	- CVE-2025-61728
+	- CVE-2025-61730
+
+## Deprecated and removed features
+
+**Deprecated features**
+- None
+
+**Removed features**
+- None
+
+---
+
+
 ## Version 2.38.0 (2026-02-11)
 
 ## Known issues
