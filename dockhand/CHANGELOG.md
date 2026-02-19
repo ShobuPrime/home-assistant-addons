@@ -1,5 +1,27 @@
 # Changelog
 
+## [1.0.18] - 2026-02-19
+
+### Changed
+- Updated Dockhand to version 1.0.18
+
+Release date: 2026-02-16
+
+Changes:
+{
+  "type": "feature",
+  "text": "Dockhand self-update from the UI"
+}
+{
+  "type": "feature",
+  "text": "Show freed disk space after image removal and pruning"
+}
+{
+  "type": "feature",
+
+---
+
+
 All notable changes to this project will be documented in this file.
 
 ## [1.0.17] - 2026-02-14

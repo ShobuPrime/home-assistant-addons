@@ -32,6 +32,6 @@ For issues specific to this Home Assistant add-on, please open an issue in this 
 
 For Dockhand application issues, see the [Dockhand GitHub repository](https://github.com/Finsys/dockhand).
 
-[release-shield]: https://img.shields.io/badge/version-1.0.10-blue.svg
+[release-shield]: https://img.shields.io/badge/version-1.0.18-blue.svg
 [release]: https://github.com/Finsys/dockhand/releases
 [project-stage-shield]: https://img.shields.io/badge/project%20stage-production%20ready-green.svg
