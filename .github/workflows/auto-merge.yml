@@ -1,166 +1,151 @@
 name: Auto-merge PRs
 
 on:
-  pull_request:
-    types: [labeled, synchronize]
-  workflow_run:
-    workflows: ["PR Validation"]
+  # Fallback sweep - catches PRs missed by the primary merge in pr-validate.yml
+  schedule:
+    - cron: '*/30 * * * *'
+  # Trigger when builder or other check suites complete
+  check_suite:
     types: [completed]
+  # Allow manual trigger
+  workflow_dispatch:
 
 permissions:
   contents: write
   pull-requests: write
+  checks: read
+  actions: read
 
 jobs:
   auto-merge:
-    name: Auto-merge PR
+    name: Auto-merge eligible PRs
     runs-on: ubuntu-latest
-    # Only run on workflow_run events or when validation-passed label is added
-    if: |
-      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success') ||
-      (github.event_name == 'pull_request' && github.event.action == 'labeled' && github.event.label.name == 'validation-passed')
     steps:
-      - name: Get PR number
-        id: pr
+      - name: Find and merge eligible PRs
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            let prNumber;
-
-            if (context.eventName === 'workflow_run') {
-              // Get PR from workflow run
-              const { data: prs } = await github.rest.pulls.list({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                state: 'open',
-                head: `${context.repo.owner}:${context.payload.workflow_run.head_branch}`
-              });
-
-              if (prs.length === 0) {
-                console.log('No open PR found for this workflow run');
-                return;
-              }
-              prNumber = prs[0].number;
-            } else {
-              prNumber = context.issue.number;
-            }
-
-            console.log(`PR number: ${prNumber}`);
-            core.setOutput('number', prNumber);
-
-      - name: Check PR conditions and merge
-        if: steps.pr.outputs.number
-        uses: actions/github-script@v7
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            const prNumber = ${{ steps.pr.outputs.number }};
-
-            const { data: pr } = await github.rest.pulls.get({
+            // List all open PRs with the 'automated' label
+            const { data: prs } = await github.rest.pulls.list({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              pull_number: prNumber
+              state: 'open',
+              sort: 'created',
+              direction: 'asc'
             });
 
-            console.log('PR Details:', {
-              number: pr.number,
-              state: pr.state,
-              draft: pr.draft,
-              mergeable: pr.mergeable,
-              mergeable_state: pr.mergeable_state,
-              user: pr.user.login
-            });
+            const automatedPrs = prs.filter(pr =>
+              pr.user.login === 'github-actions[bot]' &&
+              !pr.draft &&
+              pr.labels.some(l => l.name === 'automated')
+            );
 
-            // Only auto-merge PRs from github-actions bot
-            if (pr.user.login !== 'github-actions[bot]') {
-              console.log('PR not created by github-actions[bot], skipping auto-merge');
+            if (automatedPrs.length === 0) {
+              console.log('No eligible automated PRs found');
               return;
             }
 
-            // Check if PR is ready
-            if (pr.state !== 'open') {
-              console.log('PR is not open');
-              return;
-            }
+            console.log(`Found ${automatedPrs.length} automated PR(s) to evaluate`);
 
-            if (pr.draft) {
-              console.log('PR is a draft');
-              return;
-            }
-
-            // Check for required labels
-            const labels = pr.labels.map(l => l.name);
-            console.log('Labels:', labels);
-
-            if (!labels.includes('automated')) {
-              console.log('Missing "automated" label');
-              return;
-            }
-
-            if (!labels.includes('validation-passed')) {
-              console.log('Missing "validation-passed" label - waiting for validation');
-              return;
-            }
-
-            // Check if any blocking labels are present
             const blockingLabels = ['do-not-merge', 'needs-review', 'on-hold'];
-            const hasBlockingLabel = labels.some(l => blockingLabels.includes(l));
-            if (hasBlockingLabel) {
-              console.log('PR has blocking label');
-              return;
-            }
 
-            // Wait a moment for GitHub to calculate mergeability
-            if (pr.mergeable === null) {
-              console.log('Waiting for mergeability check...');
-              await new Promise(resolve => setTimeout(resolve, 5000));
+            for (const pr of automatedPrs) {
+              console.log(`\n--- Evaluating PR #${pr.number}: ${pr.title} ---`);
 
-              // Re-fetch PR
-              const { data: refreshedPr } = await github.rest.pulls.get({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                pull_number: prNumber
-              });
+              const labels = pr.labels.map(l => l.name);
 
-              if (!refreshedPr.mergeable) {
-                console.log('PR is not mergeable:', refreshedPr.mergeable_state);
-                return;
+              // Check for validation-passed label
+              if (!labels.includes('validation-passed')) {
+                console.log(`PR #${pr.number}: Missing "validation-passed" label, skipping`);
+                continue;
               }
-            } else if (!pr.mergeable) {
-              console.log('PR is not mergeable:', pr.mergeable_state);
-              return;
-            }
 
-            // All conditions met - merge the PR
-            console.log('All conditions met - merging PR');
+              // Check for blocking labels
+              const hasBlockingLabel = labels.some(l => blockingLabels.includes(l));
+              if (hasBlockingLabel) {
+                const found = labels.filter(l => blockingLabels.includes(l));
+                console.log(`PR #${pr.number}: Has blocking label(s): ${found.join(', ')}, skipping`);
+                continue;
+              }
 
-            try {
-              await github.rest.pulls.merge({
+              // Check all check runs (Builder + PR Validation)
+              const { data: checkRuns } = await github.rest.checks.listForRef({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
-                pull_number: prNumber,
-                merge_method: 'squash',
-                commit_title: pr.title,
-                commit_message: `${pr.body || ''}\n\nAuto-merged by GitHub Actions`
+                ref: pr.head.sha,
+                filter: 'latest'
               });
 
-              console.log('PR merged successfully');
+              const relevantRuns = checkRuns.check_runs.filter(cr =>
+                cr.name.startsWith('Build ') ||
+                cr.name === 'Initialize build' ||
+                cr.name === 'Validate Repository Structure' ||
+                cr.name === 'Validate CHANGELOG Updates' ||
+                cr.name === 'Lint YAML Files' ||
+                cr.name === 'Validation Summary'
+              );
 
-              await github.rest.issues.createComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: prNumber,
-                body: '✅ All validation checks passed. PR has been automatically merged.'
-              });
-            } catch (error) {
-              console.log('Merge failed:', error.message);
+              if (relevantRuns.length === 0) {
+                console.log(`PR #${pr.number}: No check runs found yet, skipping`);
+                continue;
+              }
 
-              // Comment about the failure
-              await github.rest.issues.createComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: prNumber,
-                body: `⚠️ Auto-merge failed: ${error.message}\n\nPlease merge manually if appropriate.`
-              });
+              const incomplete = relevantRuns.filter(cr => cr.status !== 'completed');
+              if (incomplete.length > 0) {
+                console.log(`PR #${pr.number}: ${incomplete.length} check(s) still running, skipping`);
+                continue;
+              }
+
+              const failed = relevantRuns.filter(cr => cr.conclusion !== 'success');
+              if (failed.length > 0) {
+                console.log(`PR #${pr.number}: ${failed.length} check(s) failed:`);
+                failed.forEach(cr => console.log(`  - ${cr.name}: ${cr.conclusion}`));
+                continue;
+              }
+
+              console.log(`PR #${pr.number}: All ${relevantRuns.length} checks passed`);
+
+              // Re-fetch PR for mergeability status
+              let mergeablePr;
+              for (let attempt = 1; attempt <= 3; attempt++) {
+                const { data: freshPr } = await github.rest.pulls.get({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  pull_number: pr.number
+                });
+                mergeablePr = freshPr;
+                if (mergeablePr.mergeable !== null) break;
+                console.log(`PR #${pr.number}: Waiting for mergeability (attempt ${attempt}/3)...`);
+                await new Promise(resolve => setTimeout(resolve, 5000));
+              }
+
+              if (!mergeablePr.mergeable) {
+                console.log(`PR #${pr.number}: Not mergeable (state: ${mergeablePr.mergeable_state}), skipping`);
+                continue;
+              }
+
+              // All conditions met - merge
+              console.log(`PR #${pr.number}: All conditions met - merging`);
+              try {
+                await github.rest.pulls.merge({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  pull_number: pr.number,
+                  merge_method: 'squash',
+                  commit_title: pr.title,
+                  commit_message: `${pr.body || ''}\n\nAuto-merged by GitHub Actions`
+                });
+
+                console.log(`PR #${pr.number}: Merged successfully`);
+
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: pr.number,
+                  body: '✅ All validation and build checks passed. PR has been automatically merged (via scheduled sweep).'
+                });
+              } catch (error) {
+                console.log(`PR #${pr.number}: Merge failed: ${error.message}`);
+              }
             }

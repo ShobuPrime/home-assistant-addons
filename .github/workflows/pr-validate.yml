@@ -5,9 +5,10 @@ on:
     types: [opened, synchronize, reopened]
 
 permissions:
-  contents: read
+  contents: write
   pull-requests: write
   checks: write
+  actions: read
 
 jobs:
   validate-structure:
@@ -274,4 +275,172 @@ jobs:
             } catch (e) {
               // Label might not exist, that's fine
               console.log('validation-passed label not present');
+            }
+
+  auto-merge:
+    name: Auto-merge if eligible
+    runs-on: ubuntu-latest
+    needs: [validate-structure, validate-changelog, lint-yaml, summary]
+    if: |
+      always() &&
+      needs.validate-structure.result == 'success' &&
+      needs.validate-changelog.result == 'success' &&
+      needs.lint-yaml.result == 'success' &&
+      needs.summary.result == 'success'
+    steps:
+      - name: Check conditions and merge
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const prNumber = context.issue.number;
+
+            const { data: pr } = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: prNumber
+            });
+
+            console.log('PR Details:', {
+              number: pr.number,
+              state: pr.state,
+              draft: pr.draft,
+              mergeable: pr.mergeable,
+              mergeable_state: pr.mergeable_state,
+              user: pr.user.login
+            });
+
+            // Only auto-merge PRs from github-actions bot
+            if (pr.user.login !== 'github-actions[bot]') {
+              console.log('PR not created by github-actions[bot], skipping auto-merge');
+              return;
+            }
+
+            if (pr.state !== 'open' || pr.draft) {
+              console.log('PR is not open or is a draft');
+              return;
+            }
+
+            // Check for required labels
+            const labels = pr.labels.map(l => l.name);
+            console.log('Labels:', labels);
+
+            if (!labels.includes('automated')) {
+              console.log('Missing "automated" label');
+              return;
+            }
+
+            // Check for blocking labels
+            const blockingLabels = ['do-not-merge', 'needs-review', 'on-hold'];
+            const hasBlockingLabel = labels.some(l => blockingLabels.includes(l));
+            if (hasBlockingLabel) {
+              const found = labels.filter(l => blockingLabels.includes(l));
+              console.log('PR has blocking label(s):', found);
+              return;
+            }
+
+            // Wait for Builder workflow to complete
+            console.log('Checking Builder workflow status...');
+            const maxAttempts = 30;
+            const pollInterval = 20000; // 20 seconds
+
+            for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+              const { data: checkRuns } = await github.rest.checks.listForRef({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                ref: pr.head.sha,
+                filter: 'latest'
+              });
+
+              // Find Builder check runs (build jobs from builder.yml)
+              const builderRuns = checkRuns.check_runs.filter(cr =>
+                cr.name.startsWith('Build ') || cr.name === 'Initialize build'
+              );
+
+              if (builderRuns.length === 0) {
+                console.log(`Attempt ${attempt}/${maxAttempts}: No Builder checks found yet, waiting...`);
+                if (attempt < maxAttempts) {
+                  await new Promise(resolve => setTimeout(resolve, pollInterval));
+                  continue;
+                }
+                console.log('Builder workflow never appeared - skipping merge (fallback sweep will retry)');
+                return;
+              }
+
+              const allComplete = builderRuns.every(cr => cr.status === 'completed');
+              const allSuccess = builderRuns.every(cr => cr.conclusion === 'success');
+
+              if (!allComplete) {
+                console.log(`Attempt ${attempt}/${maxAttempts}: Builder still running (${builderRuns.filter(cr => cr.status === 'completed').length}/${builderRuns.length} complete)`);
+                if (attempt < maxAttempts) {
+                  await new Promise(resolve => setTimeout(resolve, pollInterval));
+                  continue;
+                }
+                console.log('Builder did not complete in time - fallback sweep will retry');
+                return;
+              }
+
+              if (!allSuccess) {
+                const failed = builderRuns.filter(cr => cr.conclusion !== 'success');
+                console.log('Builder checks failed:', failed.map(cr => `${cr.name}: ${cr.conclusion}`));
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: prNumber,
+                  body: `⚠️ Auto-merge skipped: Builder workflow failed.\n\nFailed checks:\n${failed.map(cr => `- **${cr.name}**: ${cr.conclusion}`).join('\n')}\n\nPlease investigate and merge manually if appropriate.`
+                });
+                return;
+              }
+
+              console.log('All Builder checks passed');
+              break;
+            }
+
+            // Wait for GitHub to finalize mergeability
+            let mergeablePr = pr;
+            for (let attempt = 1; attempt <= 6; attempt++) {
+              if (mergeablePr.mergeable !== null) break;
+              console.log(`Waiting for mergeability calculation (attempt ${attempt}/6)...`);
+              await new Promise(resolve => setTimeout(resolve, 5000));
+              const { data: refreshed } = await github.rest.pulls.get({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: prNumber
+              });
+              mergeablePr = refreshed;
+            }
+
+            if (!mergeablePr.mergeable) {
+              console.log('PR is not mergeable:', mergeablePr.mergeable_state);
+              return;
+            }
+
+            // All conditions met - merge
+            console.log('All conditions met - merging PR');
+            try {
+              await github.rest.pulls.merge({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: prNumber,
+                merge_method: 'squash',
+                commit_title: pr.title,
+                commit_message: `${pr.body || ''}\n\nAuto-merged by GitHub Actions`
+              });
+
+              console.log('PR merged successfully');
+
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNumber,
+                body: '✅ All validation and build checks passed. PR has been automatically merged.'
+              });
+            } catch (error) {
+              console.log('Merge failed:', error.message);
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNumber,
+                body: `⚠️ Auto-merge failed: ${error.message}\n\nThe scheduled fallback sweep will retry, or merge manually if appropriate.`
+              });
             }

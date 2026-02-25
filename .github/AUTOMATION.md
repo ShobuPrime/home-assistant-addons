@@ -23,7 +23,7 @@ This repository uses GitHub Actions to automate addon updates, validation, and m
 
 **Labels applied:** `automated`, `portainer`, `lts`/`sts`, `update`
 
-### 2. PR Validation
+### 2. PR Validation + Auto-merge
 
 **File:** [`.github/workflows/pr-validate.yml`](workflows/pr-validate.yml)
 
@@ -48,32 +48,67 @@ This repository uses GitHub Actions to automate addon updates, validation, and m
 #### Build Testing
 - Validates Dockerfile syntax for changed addons
 
-**On success:** Adds `validation-passed` label to the PR
+**On success:** Adds `validation-passed` label, then attempts auto-merge if eligible
 
 **On failure:** Posts a comment with detailed errors
 
-### 3. Auto-merge
+#### Primary Auto-merge (built into PR Validation)
+
+After all validation jobs pass, an `auto-merge` job runs directly within the PR Validation workflow. This is the **primary merge path** and avoids the GitHub limitation where `GITHUB_TOKEN`-triggered label events cannot trigger other workflows.
+
+The auto-merge job:
+1. Checks the PR was created by `github-actions[bot]`
+2. Verifies `automated` label is present and no blocking labels exist
+3. Waits for the Builder workflow to complete successfully (polls for up to 10 minutes)
+4. Verifies the PR is mergeable
+5. Performs a squash merge
+
+### 3. Auto-merge Fallback Sweep
 
 **File:** [`.github/workflows/auto-merge.yml`](workflows/auto-merge.yml)
 
-**Trigger:** When PR validation completes, or when PR is labeled/unlabeled
+**Triggers:**
+- Every 30 minutes (scheduled sweep)
+- When a check suite completes (catches Builder completion)
+- Manual via workflow_dispatch
 
-**Conditions for auto-merge:**
-- PR created by `github-actions[bot]`
-- Has `automated` label
-- Has `validation-passed` label
-- Does NOT have blocking labels: `do-not-merge`, `needs-review`, `on-hold`
-- All required checks have passed
-- PR is not a draft
-- PR is in open state
-
-**Merge method:** Squash merge
+This is a **safety net** that catches any automated PRs the primary merge path missed (e.g., due to Builder timing out, transient errors, or race conditions).
 
 **What it does:**
-1. Verifies all conditions are met
-2. Attempts to merge the PR automatically
-3. Falls back to enabling auto-merge if direct merge fails
-4. Posts a comment on success or failure
+1. Lists all open PRs created by `github-actions[bot]` with the `automated` label
+2. For each PR, verifies:
+   - Has `validation-passed` label
+   - No blocking labels (`do-not-merge`, `needs-review`, `on-hold`)
+   - All check runs (Builder + PR Validation) have completed successfully
+   - PR is mergeable
+3. Merges eligible PRs via squash merge
+
+### Auto-merge Flow
+
+```
+Update Workflow (scheduled/manual)
+    |
+    v
+Creates PR with 'automated' label
+    |
+    v
+PR Validation runs (structure, changelog, YAML lint)
+    |-- On success: adds 'validation-passed' label
+    |                    |
+    |                    v
+    |              Auto-merge job (primary path)
+    |                - Checks bot author + labels
+    |                - Waits for Builder to complete
+    |                - Squash merges
+    |
+    v
+Builder runs (Docker image build test)
+    |
+    v
+If primary merge missed:
+    - Scheduled sweep (every 30 min) picks it up
+    - check_suite completion triggers re-evaluation
+```
 
 ## Preventing Auto-merge
 
@@ -90,6 +125,10 @@ You can manually trigger the update workflows:
 2. Select the workflow (e.g., "Update Portainer EE LTS")
 3. Click **Run workflow**
 4. Select branch and click **Run workflow**
+
+To manually trigger the auto-merge sweep:
+1. Go to **Actions** > **Auto-merge PRs**
+2. Click **Run workflow**
 
 ## Customizing Validation
 
@@ -115,11 +154,14 @@ Then add it to the `needs` array in the `summary` job.
 
 ### Modifying Auto-merge Behavior
 
-Edit [`.github/workflows/auto-merge.yml`](workflows/auto-merge.yml):
+**Primary merge path** (in `pr-validate.yml`):
+- Modify the `auto-merge` job's conditions and script
+- Adjust Builder polling timeout (`maxAttempts` and `pollInterval`)
 
-- **Change merge method:** Modify the `merge_method` parameter (options: `merge`, `squash`, `rebase`)
-- **Add more blocking labels:** Update the `blockingLabels` array
-- **Change conditions:** Modify the `if` condition in the `auto-merge` job
+**Fallback sweep** (in `auto-merge.yml`):
+- Change sweep frequency by editing the cron schedule
+- Add more blocking labels in the `blockingLabels` array
+- Change merge method (`merge`, `squash`, `rebase`)
 
 ## Documentation Update Strategy
 
@@ -148,12 +190,22 @@ Check the PR comments for specific error messages. Common issues:
 
 ### Auto-merge Not Triggering
 
-Verify:
-1. PR has `automated` label
-2. PR has `validation-passed` label
-3. No blocking labels are present
-4. All checks are green
-5. PR was created by `github-actions[bot]`
+The auto-merge system has two paths. If PRs are not being merged:
+
+1. **Check primary path** (PR Validation workflow):
+   - Look at the `Auto-merge if eligible` job in the PR Validation workflow run
+   - Verify it ran and check its logs for skip reasons
+
+2. **Check fallback sweep**:
+   - Go to Actions > "Auto-merge PRs" and verify the scheduled runs are executing
+   - Manually trigger the workflow to force a sweep
+
+3. **Common causes**:
+   - PR missing `automated` or `validation-passed` label
+   - Blocking label present (`do-not-merge`, `needs-review`, `on-hold`)
+   - Builder workflow failed or hasn't completed
+   - PR was not created by `github-actions[bot]`
+   - PR has merge conflicts (not mergeable)
 
 ### Update Script Issues
 
@@ -165,6 +217,7 @@ If the update script fails:
 ## Security Considerations
 
 - Auto-merge only works for PRs created by `github-actions[bot]`
+- Both Builder and PR Validation must pass before merge
 - Validation checks prevent malformed addons from being merged
 - Manual review can be forced with the `needs-review` label
 - All workflows use `GITHUB_TOKEN` with minimal required permissions
