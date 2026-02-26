@@ -1,5 +1,31 @@
 # Changelog
 
+## Version 2.39.0 (2026-02-26)
+
+## Known issues
+
+- On Async Edge environments, an invalid update schedule date can be displayed when browsing a snapshot
+
+### Known issues with Podman support
+
+- Auto onboarding a Podman environment defaults to "Standard" and not "Podman"
+- Podman environments aren't supported by auto-onboarding script
+- It's not possible to add Podman environments via socket, when running a Portainer server on Docker (and vice versa)
+- Support for only CentOS 9, Podman 5 rootful
+
+## Changes
+
+- Fixed an issue preventing environment group changes for Kubernetes standard agents from the environment details view
+- Addressed security vulnerability disclosure
+- Updated form behavior to only show errors after the input has been touched/visited or submitted
+- Improved HTTP response code handling via the Portainer API
+- Added default alphabetical sorting to the namespace dropdown list
+- Fixed a UI issue where the dropdown form elements were overlapping with the footer
+- Updated styling of sh
+
+---
+
+
 ## Version 2.33.7 (2026-02-11)
 
 ## Known issues
