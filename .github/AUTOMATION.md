@@ -89,26 +89,25 @@ This is a **safety net** that catches any automated PRs the primary merge path m
 Update Workflow (scheduled/manual)
     |
     v
-Creates PR with 'automated' label
+Creates PR with 'automated' label (peter-evans/create-pull-request)
     |
     v
-PR Validation runs (structure, changelog, YAML lint)
-    |-- On success: adds 'validation-passed' label
-    |                    |
-    |                    v
-    |              Auto-merge job (primary path)
-    |                - Checks bot author + labels
-    |                - Waits for Builder to complete
-    |                - Squash merges
+Fires repository_dispatch 'automated-pr-created' with PR details
+    |
+    +---> PR Validation runs (structure, changelog, YAML lint)
+    |         |-- On success: adds 'validation-passed' label
+    |         |-- Auto-merge job: polls for Builder completion, then merges
+    |
+    +---> Builder runs (Docker image build test)
     |
     v
-Builder runs (Docker image build test)
-    |
-    v
-If primary merge missed:
-    - Scheduled sweep (every 30 min) picks it up
-    - check_suite completion triggers re-evaluation
+Fallback: auto-merge.yml sweep (every 30 min) catches stragglers
 ```
+
+**Why `repository_dispatch`?** PRs created via `peter-evans/create-pull-request` use
+`GITHUB_TOKEN`, and GitHub suppresses downstream `pull_request` workflow triggers from
+`GITHUB_TOKEN` events. The `repository_dispatch` event is explicitly exempted from this
+restriction, so it reliably triggers both PR Validation and Builder workflows.
 
 ## Preventing Auto-merge
 

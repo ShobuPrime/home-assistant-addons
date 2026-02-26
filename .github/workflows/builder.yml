@@ -9,6 +9,8 @@ on:
     branches:
       - main
       - master
+  repository_dispatch:
+    types: [automated-pr-created]
 
 jobs:
   init:
@@ -22,6 +24,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
+          ref: ${{ github.event_name == 'repository_dispatch' && github.event.client_payload.head_sha || '' }}
           fetch-depth: 0
 
       - name: Discover all add-ons
@@ -45,6 +48,7 @@ jobs:
 
       - name: Get changed files
         id: changed_files
+        if: github.event_name != 'repository_dispatch'
         uses: tj-actions/changed-files@v41
 
       - name: Find changed add-ons
@@ -52,34 +56,54 @@ jobs:
         run: |
           declare -a changed_addons
 
-          # Get all addon directories dynamically
-          declare -a all_addon_dirs
-          for config in */config.yaml; do
-            addon_dir=$(dirname "$config")
-            if [[ ! "$addon_dir" =~ ^\. ]]; then
-              all_addon_dirs+=("$addon_dir")
+          # For repository_dispatch, use the addon from client_payload
+          if [ "${{ github.event_name }}" = "repository_dispatch" ]; then
+            DISPATCH_ADDON="${{ github.event.client_payload.addon }}"
+            echo "Triggered via repository_dispatch for addon: ${DISPATCH_ADDON}"
+
+            if [ "${DISPATCH_ADDON}" = "all" ]; then
+              # Build all addons
+              for config in */config.yaml; do
+                addon_dir=$(dirname "$config")
+                if [[ ! "$addon_dir" =~ ^\. ]]; then
+                  changed_addons+=("\"${addon_dir}\"")
+                  echo "Building addon: $addon_dir"
+                fi
+              done
+            else
+              changed_addons+=("\"${DISPATCH_ADDON}\"")
+              echo "Building addon: ${DISPATCH_ADDON}"
             fi
-          done
-
-          # Check if any addon files changed
-          if [[ "${{ steps.changed_files.outputs.any_changed }}" == "true" ]]; then
-            changed_files="${{ steps.changed_files.outputs.all_changed_files }}"
-
-            for addon in "${all_addon_dirs[@]}"; do
-              # Check if any file in this addon directory changed
-              if echo "$changed_files" | grep -q "^${addon}/\|${addon}/"; then
-                changed_addons+=("\"${addon}\"")
-                echo "Addon changed: $addon"
+          else
+            # Get all addon directories dynamically
+            declare -a all_addon_dirs
+            for config in */config.yaml; do
+              addon_dir=$(dirname "$config")
+              if [[ ! "$addon_dir" =~ ^\. ]]; then
+                all_addon_dirs+=("$addon_dir")
               fi
             done
-          fi
 
-          # If no changes detected (e.g., initial commit or workflow changes), build all addons
-          if [[ ${#changed_addons[@]} -eq 0 ]]; then
-            echo "No addon-specific changes detected, building all addons"
-            for addon in "${all_addon_dirs[@]}"; do
-              changed_addons+=("\"${addon}\"")
-            done
+            # Check if any addon files changed
+            if [[ "${{ steps.changed_files.outputs.any_changed }}" == "true" ]]; then
+              changed_files="${{ steps.changed_files.outputs.all_changed_files }}"
+
+              for addon in "${all_addon_dirs[@]}"; do
+                # Check if any file in this addon directory changed
+                if echo "$changed_files" | grep -q "^${addon}/\|${addon}/"; then
+                  changed_addons+=("\"${addon}\"")
+                  echo "Addon changed: $addon"
+                fi
+              done
+            fi
+
+            # If no changes detected (e.g., initial commit or workflow changes), build all addons
+            if [[ ${#changed_addons[@]} -eq 0 ]]; then
+              echo "No addon-specific changes detected, building all addons"
+              for addon in "${all_addon_dirs[@]}"; do
+                changed_addons+=("\"${addon}\"")
+              done
+            fi
           fi
 
           changed=$(echo ${changed_addons[@]} | jq -sc '.')
@@ -104,6 +128,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'repository_dispatch' && github.event.client_payload.head_sha || '' }}
 
       - name: Build ${{ matrix.addon }} add-on
         uses: home-assistant/builder@master

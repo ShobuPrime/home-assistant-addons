@@ -3,6 +3,8 @@ name: PR Validation
 on:
   pull_request:
     types: [opened, synchronize, reopened]
+  repository_dispatch:
+    types: [automated-pr-created]
 
 permissions:
   contents: write
@@ -11,14 +13,36 @@ permissions:
   actions: read
 
 jobs:
+  resolve-context:
+    name: Resolve PR context
+    runs-on: ubuntu-latest
+    outputs:
+      pr_number: ${{ steps.context.outputs.pr_number }}
+      head_sha: ${{ steps.context.outputs.head_sha }}
+      base_ref: ${{ steps.context.outputs.base_ref }}
+    steps:
+      - name: Resolve context from event
+        id: context
+        run: |
+          if [ "${{ github.event_name }}" = "repository_dispatch" ]; then
+            echo "pr_number=${{ github.event.client_payload.pull_request_number }}" >> $GITHUB_OUTPUT
+            echo "head_sha=${{ github.event.client_payload.head_sha }}" >> $GITHUB_OUTPUT
+            echo "base_ref=master" >> $GITHUB_OUTPUT
+          else
+            echo "pr_number=${{ github.event.pull_request.number }}" >> $GITHUB_OUTPUT
+            echo "head_sha=${{ github.event.pull_request.head.sha }}" >> $GITHUB_OUTPUT
+            echo "base_ref=${{ github.base_ref }}" >> $GITHUB_OUTPUT
+          fi
+
   validate-structure:
     name: Validate Repository Structure
     runs-on: ubuntu-latest
+    needs: resolve-context
     steps:
       - name: Checkout PR branch
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.head.sha }}
+          ref: ${{ needs.resolve-context.outputs.head_sha }}
 
       - name: Validate addon structure
         id: validate
@@ -92,26 +116,28 @@ jobs:
             await github.rest.issues.createComment({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              issue_number: context.issue.number,
+              issue_number: ${{ needs.resolve-context.outputs.pr_number }},
               body: `## ❌ Repository Structure Validation Failed\n\n${errors}\n\nPlease fix these issues before merging.`
             });
 
   validate-changelog:
     name: Validate CHANGELOG Updates
     runs-on: ubuntu-latest
+    needs: resolve-context
     steps:
       - name: Checkout PR branch
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.head.sha }}
+          ref: ${{ needs.resolve-context.outputs.head_sha }}
           fetch-depth: 0
 
       - name: Check CHANGELOG updates
         id: check
         run: |
           # Get list of changed files
-          git fetch origin ${{ github.base_ref }}
-          CHANGED_FILES=$(git diff --name-only origin/${{ github.base_ref }}...HEAD)
+          BASE_REF="${{ needs.resolve-context.outputs.base_ref }}"
+          git fetch origin "${BASE_REF}"
+          CHANGED_FILES=$(git diff --name-only "origin/${BASE_REF}...HEAD")
 
           EXIT_CODE=0
           WARNINGS=""
@@ -159,7 +185,7 @@ jobs:
               await github.rest.issues.createComment({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
-                issue_number: context.issue.number,
+                issue_number: ${{ needs.resolve-context.outputs.pr_number }},
                 body: `## ⚠️ CHANGELOG Validation Warnings\n\n${warnings}\n\nPlease ensure all changes are documented in CHANGELOG.md.`
               });
             }
@@ -167,11 +193,12 @@ jobs:
   lint-yaml:
     name: Lint YAML Files
     runs-on: ubuntu-latest
+    needs: resolve-context
     steps:
       - name: Checkout PR branch
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.head.sha }}
+          ref: ${{ needs.resolve-context.outputs.head_sha }}
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -201,7 +228,7 @@ jobs:
   summary:
     name: Validation Summary
     runs-on: ubuntu-latest
-    needs: [validate-structure, validate-changelog, lint-yaml]
+    needs: [resolve-context, validate-structure, validate-changelog, lint-yaml]
     if: always()
     steps:
       - name: Check validation results
@@ -236,12 +263,14 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
+            const prNumber = ${{ needs.resolve-context.outputs.pr_number }};
+
             // Remove validation-passed label if it exists (to re-add fresh)
             try {
               await github.rest.issues.removeLabel({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
-                issue_number: context.issue.number,
+                issue_number: prNumber,
                 name: 'validation-passed'
               });
             } catch (e) {
@@ -252,7 +281,7 @@ jobs:
             await github.rest.issues.addLabels({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              issue_number: context.issue.number,
+              issue_number: prNumber,
               labels: ['validation-passed']
             });
 
@@ -268,7 +297,7 @@ jobs:
               await github.rest.issues.removeLabel({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
-                issue_number: context.issue.number,
+                issue_number: ${{ needs.resolve-context.outputs.pr_number }},
                 name: 'validation-passed'
               });
               console.log('Removed validation-passed label');
@@ -280,7 +309,7 @@ jobs:
   auto-merge:
     name: Auto-merge if eligible
     runs-on: ubuntu-latest
-    needs: [validate-structure, validate-changelog, lint-yaml, summary]
+    needs: [resolve-context, validate-structure, validate-changelog, lint-yaml, summary]
     if: |
       always() &&
       needs.validate-structure.result == 'success' &&
@@ -293,7 +322,8 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            const prNumber = context.issue.number;
+            const prNumber = ${{ needs.resolve-context.outputs.pr_number }};
+            const headSha = '${{ needs.resolve-context.outputs.head_sha }}';
 
             const { data: pr } = await github.rest.pulls.get({
               owner: context.repo.owner,
@@ -348,7 +378,7 @@ jobs:
               const { data: checkRuns } = await github.rest.checks.listForRef({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
-                ref: pr.head.sha,
+                ref: headSha,
                 filter: 'latest'
               });
 
