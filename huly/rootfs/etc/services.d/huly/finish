@@ -4,7 +4,9 @@
 # Stops the Huly stack cleanly on shutdown or crash
 # ==============================================================================
 bashio::log.info "Stopping Huly stack..."
+bashio::log.debug "Finish script called with exit code: ${1:-unknown}"
 cd /data/huly 2>/dev/null && /usr/local/bin/docker-compose down 2>/dev/null
+bashio::log.debug "docker-compose down completed"
 
 if [[ "${1}" -ne 0 ]] && [[ "${1}" -ne 256 ]]; then
     bashio::log.warning "Huly crashed with exit code ${1}. Respawning..."

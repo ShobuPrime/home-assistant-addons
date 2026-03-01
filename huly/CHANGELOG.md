@@ -1,5 +1,16 @@
 # Changelog
 
+## Version 0.7.375-6 (2026-03-01)
+
+### Added
+- Verbose debug logging throughout all scripts (init, run, finish). Set
+  `log_level: debug` in the addon config to see detailed diagnostic output
+  including Docker API responses, mount info, .env contents, and compose state.
+
+### Fixed
+- Fix init crash (exit 22) when resolving host data path. The Docker API curl
+  call now handles errors gracefully with a `/proc/self/mountinfo` fallback.
+
 ## Version 0.7.375-4 (2026-03-01)
 
 ### Fixed

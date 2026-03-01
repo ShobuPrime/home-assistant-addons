@@ -7,18 +7,27 @@ bashio::log.info "Starting Huly stack..."
 
 cd /data/huly || exit 1
 
+bashio::log.debug "Working directory: $(pwd)"
+bashio::log.debug "Compose file exists: $(test -f compose.yml && echo 'yes' || echo 'no')"
+bashio::log.debug "Env file exists: $(test -f .env && echo 'yes' || echo 'no')"
+
 # Pull images first (only if needed)
 if [[ ! -f /data/huly/.images_pulled ]]; then
     bashio::log.info "Pulling Huly images (first run, this may take a while)..."
+    bashio::log.debug "Running: docker-compose pull"
     if /usr/local/bin/docker-compose pull; then
         touch /data/huly/.images_pulled
         bashio::log.info "Images pulled successfully"
     else
         bashio::log.error "Failed to pull Huly images"
+        bashio::log.debug "docker-compose pull exit code: $?"
         exit 1
     fi
+else
+    bashio::log.debug "Images already pulled (.images_pulled marker exists)"
 fi
 
 # Start the stack
 bashio::log.info "Starting Huly services..."
+bashio::log.debug "Running: docker-compose up --remove-orphans"
 exec /usr/local/bin/docker-compose up --remove-orphans 2>&1

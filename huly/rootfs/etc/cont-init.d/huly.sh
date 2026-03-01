@@ -5,22 +5,18 @@
 # ==============================================================================
 bashio::require.unprotected
 
+bashio::log.debug "Huly init script starting..."
+bashio::log.debug "Architecture: $(uname -m)"
+bashio::log.debug "Kernel: $(uname -r)"
+
 # Create data directories for all Huly services
 bashio::log.info "Creating data directories..."
-mkdir -p /data/huly
-mkdir -p /data/huly/cockroach
-mkdir -p /data/huly/cockroach-certs
-mkdir -p /data/huly/elastic
-mkdir -p /data/huly/minio
-mkdir -p /data/huly/redpanda
-
-# Ensure proper permissions
-chmod 755 /data/huly
-chmod 755 /data/huly/cockroach
-chmod 755 /data/huly/cockroach-certs
-chmod 755 /data/huly/elastic
-chmod 755 /data/huly/minio
-chmod 755 /data/huly/redpanda
+for dir in /data/huly /data/huly/cockroach /data/huly/cockroach-certs \
+           /data/huly/elastic /data/huly/minio /data/huly/redpanda; do
+    mkdir -p "${dir}"
+    chmod 755 "${dir}"
+    bashio::log.debug "Created directory: ${dir}"
+done
 
 # Generate secrets if they don't exist
 SECRETS_FILE="/data/huly/.secrets"
@@ -43,8 +39,10 @@ fi
 # Check Docker socket
 if [[ -S /var/run/docker.sock ]]; then
     bashio::log.info "Docker socket found at /var/run/docker.sock"
+    bashio::log.debug "Docker socket permissions: $(ls -la /var/run/docker.sock)"
 elif [[ -S /run/docker.sock ]]; then
     bashio::log.info "Docker socket found at /run/docker.sock"
+    bashio::log.debug "Docker socket permissions: $(ls -la /run/docker.sock)"
 else
     bashio::log.error "Docker socket not found! Huly requires Docker access."
     bashio::log.error "Please ensure the addon has the proper permissions."
@@ -54,13 +52,42 @@ fi
 # Inside the addon container /data is a bind mount from the host. Sub-containers
 # spawned via Docker Compose are created by the HOST Docker daemon, so their
 # bind-mount paths must reference the real host path, not the container path.
-# NOTE: We query the Docker API directly via the socket instead of using
-# "docker inspect" because Alpine's docker-cli segfaults on aarch64.
+# NOTE: We avoid Alpine's docker-cli entirely (segfaults on aarch64, docker/cli#4900).
+HOST_DATA_PATH=""
+
+# Method 1: Query Docker API via the Unix socket.
 CONTAINER_ID="$(hostname)"
-HOST_DATA_PATH=$(curl -sf --unix-socket /var/run/docker.sock \
-    "http://localhost/containers/${CONTAINER_ID}/json" \
-    | jq -r '.Mounts[] | select(.Destination == "/data") | .Source')
+bashio::log.info "Resolving host data path (container: ${CONTAINER_ID})..."
+bashio::log.debug "Querying Docker API: /containers/${CONTAINER_ID}/json"
+INSPECT_JSON=$(curl -s --unix-socket /var/run/docker.sock \
+    "http://localhost/containers/${CONTAINER_ID}/json" 2>/dev/null) || true
+if [[ -n "${INSPECT_JSON}" ]]; then
+    bashio::log.debug "Docker API response received (${#INSPECT_JSON} bytes)"
+    bashio::log.debug "All mounts: $(echo "${INSPECT_JSON}" | jq -c '[.Mounts[] | {Source, Destination}]' 2>/dev/null)" || true
+    HOST_DATA_PATH=$(echo "${INSPECT_JSON}" \
+        | jq -r '.Mounts[] | select(.Destination == "/data") | .Source' 2>/dev/null) || true
+    bashio::log.debug "Extracted /data mount source: '${HOST_DATA_PATH}'"
+else
+    bashio::log.debug "Docker API returned empty response"
+fi
+
+# Method 2: Parse /proc/self/mountinfo as fallback.
 if [[ -z "${HOST_DATA_PATH}" ]]; then
+    bashio::log.warning "Docker API lookup failed, trying /proc/self/mountinfo..."
+    bashio::log.debug "/proc/self/mountinfo /data entries:"
+    bashio::log.debug "$(grep ' /data ' /proc/self/mountinfo 2>/dev/null)" || true
+    # mountinfo fields: id parent major:minor root mount_point opts ... - fstype source superopts
+    # For bind mounts the source device + root give the host path.
+    HOST_DATA_PATH=$(awk '$5 == "/data" { for (i=1; i<=NF; i++) if ($i == "-") { print $(i+2); exit } }' /proc/self/mountinfo 2>/dev/null) || true
+    bashio::log.debug "mountinfo source field: '${HOST_DATA_PATH}'"
+    # On overlayfs the "source" is the device; the actual bind path is in the root field (field 4).
+    if [[ -z "${HOST_DATA_PATH}" || "${HOST_DATA_PATH}" == /dev/* ]]; then
+        HOST_DATA_PATH=$(awk '$5 == "/data" { print $4; exit }' /proc/self/mountinfo 2>/dev/null) || true
+        bashio::log.debug "mountinfo root field (fallback): '${HOST_DATA_PATH}'"
+    fi
+fi
+
+if [[ -z "${HOST_DATA_PATH}" || "${HOST_DATA_PATH}" == "/" ]]; then
     bashio::log.error "Could not determine host path for /data — volume mounts will fail."
     bashio::log.error "Falling back to /data (will only work if /data is a real host path)."
     HOST_DATA_PATH="/data"
@@ -69,8 +96,10 @@ else
 fi
 
 # Verify docker compose is available
-if /usr/local/bin/docker-compose version >/dev/null 2>&1; then
+COMPOSE_VER=$(/usr/local/bin/docker-compose version 2>&1) || true
+if [[ -n "${COMPOSE_VER}" ]]; then
     bashio::log.info "Docker Compose is available"
+    bashio::log.debug "Docker Compose version: ${COMPOSE_VER}"
 else
     bashio::log.error "Docker Compose not available!"
 fi
@@ -137,6 +166,10 @@ VOLUME_REDPANDA_PATH=${HOST_DATA_PATH}/huly/redpanda
 # Nginx config (host-side path for bind mount)
 NGINX_CONF_PATH=${HOST_DATA_PATH}/huly/nginx.conf
 EOF
+
+# Log the generated .env for debugging (redact secrets)
+bashio::log.debug "Generated .env file (secrets redacted):"
+bashio::log.debug "$(grep -v -E '(PASSWORD|SECRET|PWD)=' /data/huly/.env)" || true
 
 # Copy compose file template
 bashio::log.info "Setting up docker-compose configuration..."
