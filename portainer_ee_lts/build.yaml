@@ -3,4 +3,3 @@ build_from:
   amd64: ghcr.io/hassio-addons/base:20.0.1
 args:
   PORTAINER_VERSION: 2.39.0
-

@@ -44,4 +44,3 @@ schema:
   agent_secret: password?
   license_key: password?
   hide_hassio_containers: bool?
-
