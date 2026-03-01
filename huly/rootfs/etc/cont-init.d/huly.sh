@@ -54,13 +54,32 @@ fi
 # Inside the addon container /data is a bind mount from the host. Sub-containers
 # spawned via Docker Compose are created by the HOST Docker daemon, so their
 # bind-mount paths must reference the real host path, not the container path.
-# NOTE: We query the Docker API directly via the socket instead of using
-# "docker inspect" because Alpine's docker-cli segfaults on aarch64.
+# NOTE: We avoid Alpine's docker-cli entirely (segfaults on aarch64, docker/cli#4900).
+HOST_DATA_PATH=""
+
+# Method 1: Query Docker API via the Unix socket.
 CONTAINER_ID="$(hostname)"
-HOST_DATA_PATH=$(curl -sf --unix-socket /var/run/docker.sock \
-    "http://localhost/containers/${CONTAINER_ID}/json" \
-    | jq -r '.Mounts[] | select(.Destination == "/data") | .Source')
+bashio::log.info "Resolving host data path (container: ${CONTAINER_ID})..."
+INSPECT_JSON=$(curl -s --unix-socket /var/run/docker.sock \
+    "http://localhost/containers/${CONTAINER_ID}/json" 2>/dev/null) || true
+if [[ -n "${INSPECT_JSON}" ]]; then
+    HOST_DATA_PATH=$(echo "${INSPECT_JSON}" \
+        | jq -r '.Mounts[] | select(.Destination == "/data") | .Source' 2>/dev/null) || true
+fi
+
+# Method 2: Parse /proc/self/mountinfo as fallback.
 if [[ -z "${HOST_DATA_PATH}" ]]; then
+    bashio::log.warning "Docker API lookup failed, trying /proc/self/mountinfo..."
+    # mountinfo fields: id parent major:minor root mount_point opts ... - fstype source superopts
+    # For bind mounts the source device + root give the host path.
+    HOST_DATA_PATH=$(awk '$5 == "/data" { for (i=1; i<=NF; i++) if ($i == "-") { print $(i+2); exit } }' /proc/self/mountinfo 2>/dev/null) || true
+    # On overlayfs the "source" is the device; the actual bind path is in the root field (field 4).
+    if [[ -z "${HOST_DATA_PATH}" || "${HOST_DATA_PATH}" == /dev/* ]]; then
+        HOST_DATA_PATH=$(awk '$5 == "/data" { print $4; exit }' /proc/self/mountinfo 2>/dev/null) || true
+    fi
+fi
+
+if [[ -z "${HOST_DATA_PATH}" || "${HOST_DATA_PATH}" == "/" ]]; then
     bashio::log.error "Could not determine host path for /data — volume mounts will fail."
     bashio::log.error "Falling back to /data (will only work if /data is a real host path)."
     HOST_DATA_PATH="/data"

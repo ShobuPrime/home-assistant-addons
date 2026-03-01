@@ -1,5 +1,12 @@
 # Changelog
 
+## Version 0.7.375-5 (2026-03-01)
+
+### Fixed
+- Fix init crash (exit 22) when resolving host data path. The Docker API curl
+  call now handles errors gracefully with a `/proc/self/mountinfo` fallback.
+  Added debug logging of the container ID for troubleshooting.
+
 ## Version 0.7.375-4 (2026-03-01)
 
 ### Fixed
