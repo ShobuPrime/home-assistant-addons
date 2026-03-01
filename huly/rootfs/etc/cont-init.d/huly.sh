@@ -117,7 +117,7 @@ EOF
 
 # Copy compose file template
 bashio::log.info "Setting up docker-compose configuration..."
-cp /etc/cont-init.d/compose.yaml.tmpl /data/huly/compose.yml
+cp /opt/huly/compose.yaml.tmpl /data/huly/compose.yml
 
 # Generate nginx config for routing
 bashio::log.info "Generating nginx configuration..."
