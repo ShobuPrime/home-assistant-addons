@@ -54,7 +54,12 @@ fi
 # Inside the addon container /data is a bind mount from the host. Sub-containers
 # spawned via Docker Compose are created by the HOST Docker daemon, so their
 # bind-mount paths must reference the real host path, not the container path.
-HOST_DATA_PATH=$(docker inspect --format='{{range .Mounts}}{{if eq .Destination "/data"}}{{.Source}}{{end}}{{end}}' "$(hostname)")
+# NOTE: We query the Docker API directly via the socket instead of using
+# "docker inspect" because Alpine's docker-cli segfaults on aarch64.
+CONTAINER_ID="$(hostname)"
+HOST_DATA_PATH=$(curl -sf --unix-socket /var/run/docker.sock \
+    "http://localhost/containers/${CONTAINER_ID}/json" \
+    | jq -r '.Mounts[] | select(.Destination == "/data") | .Source')
 if [[ -z "${HOST_DATA_PATH}" ]]; then
     bashio::log.error "Could not determine host path for /data — volume mounts will fail."
     bashio::log.error "Falling back to /data (will only work if /data is a real host path)."
