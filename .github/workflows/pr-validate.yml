@@ -222,6 +222,7 @@ jobs:
               allowed-values: ['true', 'false', 'yes', 'no']
             empty-lines:
               max: 1
+              max-end: 1
             new-line-at-end-of-file: disable
           EOF
 
