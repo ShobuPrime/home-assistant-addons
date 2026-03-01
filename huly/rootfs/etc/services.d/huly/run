@@ -1,0 +1,24 @@
+#!/usr/bin/with-contenv bashio
+# ==============================================================================
+# Home Assistant Add-on: Huly
+# Starts the Huly stack via Docker Compose
+# ==============================================================================
+bashio::log.info "Starting Huly stack..."
+
+cd /data/huly || exit 1
+
+# Pull images first (only if needed)
+if [[ ! -f /data/huly/.images_pulled ]]; then
+    bashio::log.info "Pulling Huly images (first run, this may take a while)..."
+    if docker compose pull; then
+        touch /data/huly/.images_pulled
+        bashio::log.info "Images pulled successfully"
+    else
+        bashio::log.error "Failed to pull Huly images"
+        exit 1
+    fi
+fi
+
+# Start the stack
+bashio::log.info "Starting Huly services..."
+exec docker compose up --remove-orphans 2>&1
