@@ -1,5 +1,11 @@
 # Changelog
 
+## Version 0.7.375-2 (2026-03-01)
+
+### Fixed
+- Fix "undefined volume cr_certs" error by using a bind mount path for
+  CockroachDB certs instead of a Docker named volume
+
 ## Version 0.7.375-1 (2026-03-01)
 
 ### Fixed

@@ -9,6 +9,7 @@ bashio::require.unprotected
 bashio::log.info "Creating data directories..."
 mkdir -p /data/huly
 mkdir -p /data/huly/cockroach
+mkdir -p /data/huly/cockroach-certs
 mkdir -p /data/huly/elastic
 mkdir -p /data/huly/minio
 mkdir -p /data/huly/redpanda
@@ -16,6 +17,7 @@ mkdir -p /data/huly/redpanda
 # Ensure proper permissions
 chmod 755 /data/huly
 chmod 755 /data/huly/cockroach
+chmod 755 /data/huly/cockroach-certs
 chmod 755 /data/huly/elastic
 chmod 755 /data/huly/minio
 chmod 755 /data/huly/redpanda
@@ -109,7 +111,7 @@ SECRET=${SECRET}
 
 # Volumes (use bind mounts for HA persistence)
 VOLUME_CR_DATA_PATH=/data/huly/cockroach
-VOLUME_CR_CERTS_PATH=cr_certs
+VOLUME_CR_CERTS_PATH=/data/huly/cockroach-certs
 VOLUME_ELASTIC_PATH=/data/huly/elastic
 VOLUME_FILES_PATH=/data/huly/minio
 VOLUME_REDPANDA_PATH=/data/huly/redpanda
