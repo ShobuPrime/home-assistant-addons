@@ -1,5 +1,12 @@
 # Changelog
 
+## Version 0.7.375-4 (2026-03-01)
+
+### Fixed
+- Fix init script segfault (exit 139) caused by `docker inspect` on aarch64.
+  Query the Docker API directly via the Unix socket with `curl`/`jq` instead of
+  using Alpine's `docker-cli` which segfaults on aarch64 (docker/cli#4900).
+
 ## Version 0.7.375-3 (2026-03-01)
 
 ### Fixed
