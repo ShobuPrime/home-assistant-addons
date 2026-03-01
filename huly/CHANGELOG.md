@@ -1,5 +1,11 @@
 # Changelog
 
+## Version 0.7.375-1 (2026-03-01)
+
+### Fixed
+- Fix Docker Compose segfault (SIGSEGV) on aarch64 by installing compose as a
+  standalone binary instead of a Docker CLI plugin (docker/cli#4900)
+
 ## Version 0.7.375 (2026-03-01)
 
 ### Initial Release

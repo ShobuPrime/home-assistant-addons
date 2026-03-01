@@ -41,6 +41,9 @@ profile huly flags=(attach_disconnected,mediate_deleted) {
   # Docker CLI access for compose operations
   /usr/bin/docker cx -> docker,
 
+  # Standalone Docker Compose binary (bypasses plugin loader segfault on aarch64)
+  /usr/local/bin/docker-compose cx -> docker,
+
   profile docker {
     #include <abstractions/base>
 
@@ -52,7 +55,8 @@ profile huly flags=(attach_disconnected,mediate_deleted) {
     /usr/bin/docker r,
     /usr/libexec/docker/** rix,
 
-    # Docker Compose
+    # Docker Compose (standalone binary + legacy plugin paths)
+    /usr/local/bin/docker-compose rix,
     /usr/lib/docker/cli-plugins/** rix,
     /usr/libexec/docker/cli-plugins/** rix,
 

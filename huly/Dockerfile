@@ -16,17 +16,17 @@ RUN \
         jq \
         openssl
 
-# Install Docker Compose plugin standalone binary
-# The docker-cli-compose Alpine package segfaults on aarch64 inside hassio-addons base
+# Install Docker Compose as a standalone binary (NOT as a CLI plugin)
+# Alpine's docker-cli plugin loader segfaults on aarch64 (docker/cli#4900).
+# Installing to /usr/local/bin and calling it directly bypasses the plugin system entirely.
 RUN \
     ARCH="$(uname -m)" \
     && if [ "${ARCH}" = "aarch64" ]; then COMPOSE_ARCH="aarch64"; \
        elif [ "${ARCH}" = "x86_64" ]; then COMPOSE_ARCH="x86_64"; \
        else echo "Unsupported architecture: ${ARCH}"; exit 1; fi \
-    && mkdir -p /usr/lib/docker/cli-plugins \
-    && curl -fsSL -o /usr/lib/docker/cli-plugins/docker-compose \
+    && curl -fsSL -o /usr/local/bin/docker-compose \
         "https://github.com/docker/compose/releases/latest/download/docker-compose-linux-${COMPOSE_ARCH}" \
-    && chmod +x /usr/lib/docker/cli-plugins/docker-compose
+    && chmod +x /usr/local/bin/docker-compose
 
 # Copy root filesystem
 COPY rootfs /
