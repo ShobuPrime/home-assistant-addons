@@ -10,7 +10,7 @@ cd /data/huly || exit 1
 # Pull images first (only if needed)
 if [[ ! -f /data/huly/.images_pulled ]]; then
     bashio::log.info "Pulling Huly images (first run, this may take a while)..."
-    if docker compose pull; then
+    if /usr/local/bin/docker-compose pull; then
         touch /data/huly/.images_pulled
         bashio::log.info "Images pulled successfully"
     else
@@ -21,4 +21,4 @@ fi
 
 # Start the stack
 bashio::log.info "Starting Huly services..."
-exec docker compose up --remove-orphans 2>&1
+exec /usr/local/bin/docker-compose up --remove-orphans 2>&1

@@ -49,7 +49,7 @@ else
 fi
 
 # Verify docker compose is available
-if docker compose version >/dev/null 2>&1; then
+if /usr/local/bin/docker-compose version >/dev/null 2>&1; then
     bashio::log.info "Docker Compose is available"
 else
     bashio::log.error "Docker Compose not available!"
