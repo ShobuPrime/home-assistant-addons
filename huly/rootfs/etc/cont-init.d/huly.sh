@@ -50,6 +50,19 @@ else
     bashio::log.error "Please ensure the addon has the proper permissions."
 fi
 
+# Resolve the host-side path for /data.
+# Inside the addon container /data is a bind mount from the host. Sub-containers
+# spawned via Docker Compose are created by the HOST Docker daemon, so their
+# bind-mount paths must reference the real host path, not the container path.
+HOST_DATA_PATH=$(docker inspect --format='{{range .Mounts}}{{if eq .Destination "/data"}}{{.Source}}{{end}}{{end}}' "$(hostname)")
+if [[ -z "${HOST_DATA_PATH}" ]]; then
+    bashio::log.error "Could not determine host path for /data — volume mounts will fail."
+    bashio::log.error "Falling back to /data (will only work if /data is a real host path)."
+    HOST_DATA_PATH="/data"
+else
+    bashio::log.info "Resolved host data path: ${HOST_DATA_PATH}"
+fi
+
 # Verify docker compose is available
 if /usr/local/bin/docker-compose version >/dev/null 2>&1; then
     bashio::log.info "Docker Compose is available"
@@ -109,12 +122,15 @@ REDPANDA_ADMIN_PWD=${REDPANDA_ADMIN_PWD}
 # Secret
 SECRET=${SECRET}
 
-# Volumes (use bind mounts for HA persistence)
-VOLUME_CR_DATA_PATH=/data/huly/cockroach
-VOLUME_CR_CERTS_PATH=/data/huly/cockroach-certs
-VOLUME_ELASTIC_PATH=/data/huly/elastic
-VOLUME_FILES_PATH=/data/huly/minio
-VOLUME_REDPANDA_PATH=/data/huly/redpanda
+# Volumes (host-side paths for bind mounts into sub-containers)
+VOLUME_CR_DATA_PATH=${HOST_DATA_PATH}/huly/cockroach
+VOLUME_CR_CERTS_PATH=${HOST_DATA_PATH}/huly/cockroach-certs
+VOLUME_ELASTIC_PATH=${HOST_DATA_PATH}/huly/elastic
+VOLUME_FILES_PATH=${HOST_DATA_PATH}/huly/minio
+VOLUME_REDPANDA_PATH=${HOST_DATA_PATH}/huly/redpanda
+
+# Nginx config (host-side path for bind mount)
+NGINX_CONF_PATH=${HOST_DATA_PATH}/huly/nginx.conf
 EOF
 
 # Copy compose file template

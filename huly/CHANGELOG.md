@@ -1,5 +1,12 @@
 # Changelog
 
+## Version 0.7.375-3 (2026-03-01)
+
+### Fixed
+- Fix "read-only file system" error for volume mounts by resolving host-side
+  paths at runtime via `docker inspect`. Sub-containers are created by the host
+  Docker daemon and need real host paths, not addon-internal `/data` paths.
+
 ## Version 0.7.375-2 (2026-03-01)
 
 ### Fixed

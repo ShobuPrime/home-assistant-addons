@@ -5,7 +5,7 @@ services:
     ports:
       - "8087:80"
     volumes:
-      - /data/huly/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ${NGINX_CONF_PATH}:/etc/nginx/conf.d/default.conf:ro
     restart: unless-stopped
     depends_on:
       - front
