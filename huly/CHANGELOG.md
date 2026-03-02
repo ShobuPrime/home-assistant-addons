@@ -1,5 +1,15 @@
 # Changelog
 
+## Version 0.7.375-15 (2026-03-02)
+
+> Addon-level fixes only — not pulled from upstream Huly.
+
+### Changed
+- Change external port from 8087 to 4859 to avoid conflict with other services
+  already bound to port 8087. Nginx failed to start with "Bind for :::8087
+  failed: port is already allocated", preventing the entire Huly stack from
+  becoming reachable.
+
 ## Version 0.7.375-12 (2026-03-01)
 
 > Addon-level fixes only — not pulled from upstream Huly.

@@ -18,7 +18,7 @@ This is a Home Assistant Add-on for Huly, an open-source all-in-one project mana
 ### Internal Services (14 total)
 The add-on orchestrates these services via Docker Compose:
 
-1. **nginx** - Reverse proxy (only externally exposed service, port 8087)
+1. **nginx** - Reverse proxy (only externally exposed service, port 4859)
 2. **CockroachDB** - Distributed SQL database
 3. **Elasticsearch** - Full-text search engine
 4. **MinIO** - S3-compatible object storage
@@ -67,7 +67,7 @@ Huly version tracking is based on the `.template.huly.conf` file in the [huly-se
 - [ ] Add-on installs without errors
 - [ ] Protection mode is disabled and Docker socket is accessible
 - [ ] All 14 services start successfully (check logs)
-- [ ] Web UI is accessible on port 8087
+- [ ] Web UI is accessible on port 4859
 - [ ] Ingress integration works from HA sidebar
 - [ ] WebSocket connections work (real-time updates in UI)
 - [ ] Can create a workspace and user account

@@ -60,11 +60,11 @@ Set these values if you want credentials to survive an add-on reinstall without 
 ## Access Methods
 
 1. **Via Sidebar**: Click the Huly icon in Home Assistant (uses ingress)
-2. **Direct HTTP**: `http://[your-ip]:8087`
+2. **Direct HTTP**: `http://[your-ip]:4859`
 
 ## Port Information
 
-- **8087**: HTTP web interface (default and only exposed port)
+- **4859**: HTTP web interface (default and only exposed port)
 
 ## System Requirements
 
@@ -104,7 +104,7 @@ Huly runs 14 internal Docker services, all orchestrated via Docker Compose:
 - **Sign**: Document signing service
 - **Stats**: Analytics and telemetry collection
 
-All services communicate over an internal Docker network. Only nginx (port 8087) is exposed externally.
+All services communicate over an internal Docker network. Only nginx (port 4859) is exposed externally.
 
 ## Data Persistence
 
@@ -161,7 +161,7 @@ All 14 internal services communicate over a private Docker network. Only the ngi
 Ensure protection mode is disabled in the addon configuration.
 
 ### Ingress not working
-Ensure the ingress port is set to 8087 (the default Huly proxy port).
+Ensure the ingress port is set to 4859 (the default Huly proxy port).
 
 ### Slow or unresponsive after startup
 - Allow 3-5 minutes for all services to fully initialize on first start

@@ -114,7 +114,7 @@ add-on configuration for the Docker socket to be accessible.
 - **Startup Time**: First start can take several minutes while services initialize
 - **Protection Mode**: Must be disabled for Docker socket access
 - Full Docker socket access is required
-- Ingress port must be set to 8087 (default)
+- Ingress port must be set to 4859 (default)
 - Only aarch64 and amd64 architectures are supported
 
 ## Support

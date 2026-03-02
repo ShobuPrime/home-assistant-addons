@@ -1,10 +1,10 @@
 name: "Huly"
 description: "All-in-one project management platform - alternative to Linear, Jira, Slack, and Notion"
-version: "0.7.375-14"
+version: "0.7.375-15"
 slug: "huly"
 init: false
 ingress: true
-ingress_port: 8087
+ingress_port: 4859
 ingress_stream: true
 panel_icon: mdi:clipboard-check-multiple-outline
 panel_title: Huly
@@ -14,11 +14,11 @@ arch:
 startup: application
 timeout: 120
 boot: auto
-watchdog: tcp://[HOST]:[PORT:8087]/
+watchdog: tcp://[HOST]:[PORT:4859]/
 ports:
-  8087/tcp: 8087
+  4859/tcp: 4859
 ports_description:
-  8087/tcp: "Huly web interface"
+  4859/tcp: "Huly web interface"
 host_network: false
 apparmor: true
 hassio_api: true

@@ -296,7 +296,7 @@ LAST_NAME_FIRST=$(bashio::config 'last_name_first')
 if bashio::var.has_value "${HOST_ADDRESS}"; then
     bashio::log.info "Using configured host address: ${HOST_ADDRESS}"
 else
-    HOST_ADDRESS="localhost:8087"
+    HOST_ADDRESS="localhost:4859"
     bashio::log.info "No host_address configured, using default: ${HOST_ADDRESS}"
 fi
 
