@@ -1,5 +1,26 @@
 # Changelog
 
+## Version 0.7.375-11 (2026-03-01)
+
+> Addon-level fixes only — not pulled from upstream Huly.
+
+### Fixed
+- Fix `front` crash-looping with "please provide calendar service url" by adding
+  all required service URLs (`CALENDAR_URL`, `GMAIL_URL`, `TELEGRAM_URL`,
+  `LOVE_ENDPOINT`) matching the upstream huly-selfhost compose template. These
+  point at `http://${HOST_ADDRESS}/_<service>` paths even when those optional
+  services aren't deployed — the frontend requires them to be defined.
+- Fix CockroachDB "password authentication failed for user selfhost" when secrets
+  are regenerated but database data persists (e.g. addon reinstall without full
+  data wipe). Added a `cockroach-init` service that runs after CockroachDB is
+  healthy and idempotently creates the user, sets the password, and grants
+  permissions. All DB-dependent services (`kvs`, `account`, `workspace`,
+  `transactor`) now depend on `cockroach-init` completing successfully.
+- Fix Redpanda exit code 133 (SIGTRAP) on aarch64 by adding `--memory 512M` and
+  `--check=false` flags. The Seastar framework's automatic memory detection
+  triggers an assertion failure on ARM64 systems; explicit memory limits bypass
+  this (redpanda-data/redpanda#12144).
+
 ## Version 0.7.375-10 (2026-03-01)
 
 > Addon-level fixes only — not pulled from upstream Huly.

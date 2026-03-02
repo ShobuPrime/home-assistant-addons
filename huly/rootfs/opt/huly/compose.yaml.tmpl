@@ -32,6 +32,24 @@ services:
     networks:
       - huly_net
 
+  cockroach-init:
+    image: cockroachdb/cockroach:latest-v24.2
+    depends_on:
+      cockroach:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        /cockroach/cockroach sql --insecure --host=cockroach:26257 -e "
+        CREATE USER IF NOT EXISTS ${CR_USERNAME};
+        ALTER USER ${CR_USERNAME} WITH PASSWORD '${CR_USER_PASSWORD}';
+        CREATE DATABASE IF NOT EXISTS ${CR_DATABASE};
+        GRANT ALL ON DATABASE ${CR_DATABASE} TO ${CR_USERNAME};
+        " && echo 'CockroachDB user provisioned successfully'
+    restart: "no"
+    networks:
+      - huly_net
+
   redpanda:
     image: docker.redpanda.com/redpandadata/redpanda:v24.3.6
     command:
@@ -46,6 +64,8 @@ services:
       - --advertise-rpc-addr redpanda:33145
       - --mode dev-container
       - --smp 1
+      - --memory 512M
+      - --check=false
       - --default-log-level=info
     container_name: redpanda
     volumes:
@@ -128,8 +148,8 @@ services:
       - QUEUE_CONFIG=redpanda:9092
     restart: unless-stopped
     depends_on:
-      cockroach:
-        condition: service_healthy
+      cockroach-init:
+        condition: service_completed_successfully
       redpanda:
         condition: service_healthy
       minio:
@@ -165,8 +185,8 @@ services:
       - QUEUE_CONFIG=redpanda:9092
     restart: unless-stopped
     depends_on:
-      cockroach:
-        condition: service_healthy
+      cockroach-init:
+        condition: service_completed_successfully
     networks:
       - huly_net
 
@@ -184,8 +204,8 @@ services:
       - ACCOUNTS_DB_URL=${CR_DB_URL}
     restart: unless-stopped
     depends_on:
-      cockroach:
-        condition: service_healthy
+      cockroach-init:
+        condition: service_completed_successfully
     networks:
       - huly_net
 
@@ -197,12 +217,15 @@ services:
       - ACCOUNTS_URL=http://${HOST_ADDRESS}/_accounts
       - ACCOUNTS_URL_INTERNAL=http://account:3000
       - REKONI_URL=http://${HOST_ADDRESS}/_rekoni
+      - CALENDAR_URL=http://${HOST_ADDRESS}/_calendar
+      - GMAIL_URL=http://${HOST_ADDRESS}/_gmail
+      - TELEGRAM_URL=http://${HOST_ADDRESS}/_telegram
+      - LOVE_ENDPOINT=http://${HOST_ADDRESS}/_love
       - STATS_URL=http://${HOST_ADDRESS}/_stats
       - UPLOAD_URL=/files
       - ELASTIC_URL=http://elastic:9200
       - COLLABORATOR_URL=ws://${HOST_ADDRESS}/_collaborator
       - STORAGE_CONFIG=minio|minio?accessKey=${MINIO_ROOT_USER}&secretKey=${MINIO_ROOT_PASSWORD}
-      - GMAIL_URL=
       - TITLE=${TITLE}
       - DEFAULT_LANGUAGE=${DEFAULT_LANGUAGE}
       - LAST_NAME_FIRST=${LAST_NAME_FIRST}
@@ -241,8 +264,8 @@ services:
   kvs:
     image: hardcoreeng/hulykvs:${HULY_VERSION}
     depends_on:
-      cockroach:
-        condition: service_healthy
+      cockroach-init:
+        condition: service_completed_successfully
     environment:
       - HULY_DB_CONNECTION=${CR_DB_URL}
       - HULY_TOKEN_SECRET=${SECRET}
