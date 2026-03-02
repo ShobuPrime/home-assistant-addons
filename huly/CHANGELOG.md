@@ -10,6 +10,10 @@
 ### Fixed
 - Fix init crash (exit 22) when resolving host data path. The Docker API curl
   call now handles errors gracefully with a `/proc/self/mountinfo` fallback.
+- Fix "read-only file system" error for volume mounts on HAOS. Docker inspect
+  returns paths relative to the HAOS data partition (e.g. `/supervisor/...`),
+  not the actual host root. Now discovers the data partition mount prefix from
+  Docker's `DockerRootDir` and prepends it (e.g. `/mnt/data/supervisor/...`).
 
 ## Version 0.7.375-4 (2026-03-01)
 
