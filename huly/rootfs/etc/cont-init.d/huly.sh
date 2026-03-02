@@ -52,10 +52,33 @@ fi
 # Inside the addon container /data is a bind mount from the host. Sub-containers
 # spawned via Docker Compose are created by the HOST Docker daemon, so their
 # bind-mount paths must reference the real host path, not the container path.
+#
+# In HAOS the Docker inspect source for /data returns a path like
+# /supervisor/addons/data/<slug> — but that's relative to the data partition,
+# NOT the host root. The host root is read-only; the data partition is mounted
+# at e.g. /mnt/data. We discover the data partition mount point from Docker's
+# own DockerRootDir (typically /mnt/data/docker → prefix is /mnt/data).
+#
 # NOTE: We avoid Alpine's docker-cli entirely (segfaults on aarch64, docker/cli#4900).
 HOST_DATA_PATH=""
+DATA_PARTITION_PREFIX=""
 
-# Method 1: Query Docker API via the Unix socket.
+# Step 1: Discover the HAOS data partition prefix from Docker's root dir.
+# DockerRootDir is typically /mnt/data/docker — strip the /docker suffix.
+bashio::log.info "Discovering HAOS data partition layout..."
+DOCKER_INFO=$(curl -s --unix-socket /var/run/docker.sock \
+    "http://localhost/info" 2>/dev/null) || true
+if [[ -n "${DOCKER_INFO}" ]]; then
+    DOCKER_ROOT_DIR=$(echo "${DOCKER_INFO}" | jq -r '.DockerRootDir // empty' 2>/dev/null) || true
+    bashio::log.debug "DockerRootDir: '${DOCKER_ROOT_DIR}'"
+    # Strip the trailing /docker to get the data partition mount point
+    if [[ "${DOCKER_ROOT_DIR}" == */docker ]]; then
+        DATA_PARTITION_PREFIX="${DOCKER_ROOT_DIR%/docker}"
+        bashio::log.debug "Data partition prefix: '${DATA_PARTITION_PREFIX}'"
+    fi
+fi
+
+# Step 2: Get the /data mount source from container inspect.
 CONTAINER_ID="$(hostname)"
 bashio::log.info "Resolving host data path (container: ${CONTAINER_ID})..."
 bashio::log.debug "Querying Docker API: /containers/${CONTAINER_ID}/json"
@@ -64,26 +87,37 @@ INSPECT_JSON=$(curl -s --unix-socket /var/run/docker.sock \
 if [[ -n "${INSPECT_JSON}" ]]; then
     bashio::log.debug "Docker API response received (${#INSPECT_JSON} bytes)"
     bashio::log.debug "All mounts: $(echo "${INSPECT_JSON}" | jq -c '[.Mounts[] | {Source, Destination}]' 2>/dev/null)" || true
-    HOST_DATA_PATH=$(echo "${INSPECT_JSON}" \
+    MOUNT_SOURCE=$(echo "${INSPECT_JSON}" \
         | jq -r '.Mounts[] | select(.Destination == "/data") | .Source' 2>/dev/null) || true
-    bashio::log.debug "Extracted /data mount source: '${HOST_DATA_PATH}'"
+    bashio::log.debug "Extracted /data mount source: '${MOUNT_SOURCE}'"
+
+    if [[ -n "${MOUNT_SOURCE}" ]]; then
+        # If the mount source already starts with the data partition prefix, use as-is.
+        # Otherwise, prepend the prefix (HAOS stores paths relative to the data partition).
+        if [[ -n "${DATA_PARTITION_PREFIX}" && "${MOUNT_SOURCE}" != "${DATA_PARTITION_PREFIX}"* ]]; then
+            HOST_DATA_PATH="${DATA_PARTITION_PREFIX}${MOUNT_SOURCE}"
+            bashio::log.debug "Prepended data partition prefix: '${HOST_DATA_PATH}'"
+        else
+            HOST_DATA_PATH="${MOUNT_SOURCE}"
+        fi
+    fi
 else
     bashio::log.debug "Docker API returned empty response"
 fi
 
-# Method 2: Parse /proc/self/mountinfo as fallback.
+# Step 3: Parse /proc/self/mountinfo as fallback.
 if [[ -z "${HOST_DATA_PATH}" ]]; then
     bashio::log.warning "Docker API lookup failed, trying /proc/self/mountinfo..."
     bashio::log.debug "/proc/self/mountinfo /data entries:"
     bashio::log.debug "$(grep ' /data ' /proc/self/mountinfo 2>/dev/null)" || true
-    # mountinfo fields: id parent major:minor root mount_point opts ... - fstype source superopts
-    # For bind mounts the source device + root give the host path.
-    HOST_DATA_PATH=$(awk '$5 == "/data" { for (i=1; i<=NF; i++) if ($i == "-") { print $(i+2); exit } }' /proc/self/mountinfo 2>/dev/null) || true
-    bashio::log.debug "mountinfo source field: '${HOST_DATA_PATH}'"
-    # On overlayfs the "source" is the device; the actual bind path is in the root field (field 4).
-    if [[ -z "${HOST_DATA_PATH}" || "${HOST_DATA_PATH}" == /dev/* ]]; then
-        HOST_DATA_PATH=$(awk '$5 == "/data" { print $4; exit }' /proc/self/mountinfo 2>/dev/null) || true
-        bashio::log.debug "mountinfo root field (fallback): '${HOST_DATA_PATH}'"
+    MOUNT_ROOT=$(awk '$5 == "/data" { print $4; exit }' /proc/self/mountinfo 2>/dev/null) || true
+    bashio::log.debug "mountinfo root field: '${MOUNT_ROOT}'"
+    if [[ -n "${MOUNT_ROOT}" && "${MOUNT_ROOT}" != "/" ]]; then
+        if [[ -n "${DATA_PARTITION_PREFIX}" ]]; then
+            HOST_DATA_PATH="${DATA_PARTITION_PREFIX}${MOUNT_ROOT}"
+        else
+            HOST_DATA_PATH="${MOUNT_ROOT}"
+        fi
     fi
 fi
 
