@@ -371,77 +371,82 @@ server {
     listen 80;
     server_name _;
 
-    client_max_body_size 256m;
-    proxy_read_timeout 86400s;
-    proxy_send_timeout 86400s;
+    client_max_body_size 100M;
 
     location / {
-        proxy_pass http://front:8080;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_pass http://front:8080;
     }
 
     location /_accounts {
-        rewrite ^/_accounts(/.*)$ $1 break;
-        proxy_pass http://account:3000;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
-    }
 
-    location /_transactor {
-        rewrite ^/_transactor(/.*)$ $1 break;
-        proxy_pass http://transactor:3333;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
+        rewrite ^/_accounts(/.*)$ $1 break;
+        proxy_pass http://account:3000/;
     }
 
     location /_collaborator {
-        rewrite ^/_collaborator(/.*)$ $1 break;
-        proxy_pass http://collaborator:3078;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
+
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        rewrite ^/_collaborator(/.*)$ $1 break;
+        proxy_pass http://collaborator:3078/;
+    }
+
+    location /_transactor {
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        rewrite ^/_transactor(/.*)$ $1 break;
+        proxy_pass http://transactor:3333/;
+    }
+
+    location ~ ^/eyJ {
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_pass http://transactor:3333;
     }
 
     location /_rekoni {
-        rewrite ^/_rekoni(/.*)$ $1 break;
-        proxy_pass http://rekoni:4004;
-        proxy_http_version 1.1;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
+
+        rewrite ^/_rekoni(/.*)$ $1 break;
+        proxy_pass http://rekoni:4004/;
     }
 
     location /_stats {
-        rewrite ^/_stats(/.*)$ $1 break;
-        proxy_pass http://stats:4900;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
+
+        rewrite ^/_stats(/.*)$ $1 break;
+        proxy_pass http://stats:4900/;
     }
 
     location /files {
