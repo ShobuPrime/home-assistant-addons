@@ -1,6 +1,6 @@
 name: "Huly"
 description: "All-in-one project management platform - alternative to Linear, Jira, Slack, and Notion"
-version: "0.7.375-13"
+version: "0.7.375-14"
 slug: "huly"
 init: false
 ingress: true

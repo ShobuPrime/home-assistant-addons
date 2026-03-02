@@ -18,10 +18,6 @@ for dir in /data/huly /data/huly/cockroach /data/huly/cockroach-certs \
     bashio::log.debug "Created directory: ${dir}"
 done
 
-# Elasticsearch requires its data directory owned by uid 1000 (elasticsearch user)
-chown -R 1000:1000 /data/huly/elastic
-bashio::log.debug "Set /data/huly/elastic ownership to 1000:1000"
-
 # ---------------------------------------------------------------------------
 # Resolve credentials: config UI value > existing secrets file > auto-generate
 # ---------------------------------------------------------------------------
@@ -51,18 +47,32 @@ for val in "${CFG_SECRET}" "${CFG_CR_PASSWORD}" "${CFG_REDPANDA_PWD}" \
     fi
 done
 
-# Stale-data safety net: if there is NO secrets file AND NO config passwords
-# but CockroachDB data already exists, we have an unrecoverable credential
-# mismatch — wipe service data so everything re-initialises cleanly.
-if [[ ! -f "${SECRETS_FILE}" ]] && [[ "${HAS_CONFIG_PASSWORDS}" == "false" ]]; then
-    if [[ -d /data/huly/cockroach ]] && [[ -n "$(ls -A /data/huly/cockroach 2>/dev/null)" ]]; then
+# Stale-data safety net.
+# Case 1: No secrets file + no config passwords + existing DB data → full wipe.
+# Case 2: Secrets file exists + no config passwords + existing DB data but the
+#          secrets file was written by a DIFFERENT init run than the one that
+#          provisioned CockroachDB. We detect this with a canary file that is
+#          created atomically with the secrets and deleted on data wipe.
+NEEDS_DATA_WIPE=false
+
+if [[ -d /data/huly/cockroach ]] && [[ -n "$(ls -A /data/huly/cockroach 2>/dev/null)" ]]; then
+    if [[ ! -f "${SECRETS_FILE}" ]] && [[ "${HAS_CONFIG_PASSWORDS}" == "false" ]]; then
         bashio::log.warning "Secrets file missing, no config passwords set, but database data exists — credential mismatch detected."
-        bashio::log.warning "Wiping stale service data for fresh initialization..."
-        for dir in cockroach cockroach-certs elastic minio redpanda; do
-            rm -rf "/data/huly/${dir:?}"/*
-            bashio::log.debug "Cleared /data/huly/${dir}"
-        done
+        NEEDS_DATA_WIPE=true
+    elif [[ -f "${SECRETS_FILE}" ]] && [[ ! -f /data/huly/.secrets_canary ]] && [[ "${HAS_CONFIG_PASSWORDS}" == "false" ]]; then
+        bashio::log.warning "Secrets file exists but canary missing — secrets were regenerated without re-provisioning databases."
+        NEEDS_DATA_WIPE=true
     fi
+fi
+
+if [[ "${NEEDS_DATA_WIPE}" == "true" ]]; then
+    bashio::log.warning "Wiping stale service data for fresh initialization..."
+    for dir in cockroach cockroach-certs elastic minio redpanda; do
+        rm -rf "/data/huly/${dir:?}"/*
+        bashio::log.debug "Cleared /data/huly/${dir}"
+    done
+    # Remove stale canary so a new one is created with fresh secrets
+    rm -f /data/huly/.secrets_canary
 fi
 
 # Resolve each credential: config value > existing secret > auto-generate
@@ -83,6 +93,17 @@ REDPANDA_ADMIN_PWD=$(resolve_credential "${CFG_REDPANDA_PWD}" "${REDPANDA_ADMIN_
 MINIO_ROOT_USER=$(resolve_credential "${CFG_MINIO_USER}" "${MINIO_ROOT_USER:-}" "openssl rand -hex 8")
 MINIO_ROOT_PASSWORD=$(resolve_credential "${CFG_MINIO_PWD}" "${MINIO_ROOT_PASSWORD:-}" "openssl rand -hex 16")
 
+# MinIO enforces minimum lengths: user >= 3, password >= 8.
+# Guard against edge cases (corrupt secrets file, truncated values).
+if [[ "${#MINIO_ROOT_USER}" -lt 3 ]]; then
+    bashio::log.warning "MINIO_ROOT_USER too short (${#MINIO_ROOT_USER} chars), regenerating..."
+    MINIO_ROOT_USER=$(openssl rand -hex 8)
+fi
+if [[ "${#MINIO_ROOT_PASSWORD}" -lt 8 ]]; then
+    bashio::log.warning "MINIO_ROOT_PASSWORD too short (${#MINIO_ROOT_PASSWORD} chars), regenerating..."
+    MINIO_ROOT_PASSWORD=$(openssl rand -hex 16)
+fi
+
 # Persist resolved values so subsequent restarts (without config changes) reuse them
 cat > "${SECRETS_FILE}" << EOF
 SECRET=${SECRET}
@@ -92,7 +113,19 @@ MINIO_ROOT_USER=${MINIO_ROOT_USER}
 MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD}
 EOF
 chmod 600 "${SECRETS_FILE}"
+
+# Write a canary file atomically with the secrets. When CockroachDB starts with
+# an empty data dir it provisions COCKROACH_USER/PASSWORD from the environment.
+# If the canary is missing but DB data exists, the secrets don't match the data.
+if [[ ! -f /data/huly/.secrets_canary ]]; then
+    date -Iseconds > /data/huly/.secrets_canary
+fi
 bashio::log.info "Credentials resolved and saved"
+
+# Elasticsearch requires its data directory owned by uid 1000 (elasticsearch user).
+# Run AFTER the stale-data wipe so a freshly-cleared directory gets correct ownership.
+chown -R 1000:1000 /data/huly/elastic
+bashio::log.debug "Set /data/huly/elastic ownership to 1000:1000"
 
 # Check Docker socket
 if [[ -S /var/run/docker.sock ]]; then
@@ -111,14 +144,13 @@ fi
 # spawned via Docker Compose are created by the HOST Docker daemon, so their
 # bind-mount paths must reference the real host path, not the container path.
 #
-# In HAOS, docker inspect returns a path like /supervisor/addons/data/<slug>,
-# but the Docker daemon can't access /supervisor directly (the host root FS is
-# read-only and /supervisor is a mount that only exists in certain contexts).
-# The real host path requires a prefix like /mnt/data.
+# In HAOS, docker inspect returns a path like /mnt/data/supervisor/addons/data/<slug>
+# which IS the real host path. In some setups it may return /supervisor/addons/data/<slug>
+# which needs a /mnt/data prefix.
 #
-# Strategy: get the inspect path, build candidate prefixes from DockerRootDir,
-# then TEST each candidate by creating a temporary Docker volume with a bind
-# mount. The first one Docker can actually access is the correct host path.
+# Strategy: get the inspect path, check if it already starts with DockerRootDir's
+# parent (indicating it's already a full host path), then try prefixed candidates
+# only if needed. Verify each candidate with a Docker volume bind test.
 #
 # NOTE: We avoid Alpine's docker-cli entirely (segfaults on aarch64, docker/cli#4900).
 HOST_DATA_PATH=""
@@ -164,16 +196,26 @@ fi
 
 # Step 3: Build candidate paths and test each by creating a temporary volume.
 # A successful volume create with bind mount proves Docker daemon can access it.
+#
+# IMPORTANT: If MOUNT_SOURCE already starts with a known prefix (e.g. /mnt/data),
+# skip prepending that prefix to avoid doubled paths like /mnt/data/mnt/data/...
 if [[ -n "${MOUNT_SOURCE}" ]]; then
-    # Build list of prefixes to try (most specific first)
-    PREFIXES=""
-    # From DockerRootDir: e.g. /mnt/data/docker → try /mnt/data
+    # Derive the data partition prefix from DockerRootDir (e.g. /mnt/data/docker → /mnt/data)
+    DATA_PREFIX=""
     if [[ "${DOCKER_ROOT_DIR}" == */docker ]]; then
-        PREFIXES="${DOCKER_ROOT_DIR%/docker}"
+        DATA_PREFIX="${DOCKER_ROOT_DIR%/docker}"
     fi
-    # Also try /mnt/data (standard HAOS)
-    PREFIXES="${PREFIXES} /mnt/data"
-    # Try no prefix (in case the path works directly)
+
+    # Build list of prefixes to try (most specific first), but skip any prefix
+    # that MOUNT_SOURCE already starts with to prevent doubling.
+    PREFIXES=""
+    if [[ -n "${DATA_PREFIX}" ]] && [[ "${MOUNT_SOURCE}" != "${DATA_PREFIX}"* ]]; then
+        PREFIXES="${DATA_PREFIX}"
+    fi
+    if [[ "${MOUNT_SOURCE}" != /mnt/data* ]]; then
+        PREFIXES="${PREFIXES} /mnt/data"
+    fi
+    # Always try no prefix last (in case the path works directly)
     PREFIXES="${PREFIXES} "
 
     TEST_VOL_NAME="huly_path_test_$$"
@@ -204,6 +246,24 @@ if [[ -n "${MOUNT_SOURCE}" ]]; then
                 -X DELETE "http://localhost/volumes/${TEST_VOL_NAME}" 2>/dev/null || true
         fi
     done
+
+    # If prefixed candidates all failed, try MOUNT_SOURCE directly (it may already
+    # be the correct full host path, as is common on recent HAOS).
+    if [[ -z "${HOST_DATA_PATH}" ]]; then
+        bashio::log.debug "Prefixed candidates failed, testing MOUNT_SOURCE directly: '${MOUNT_SOURCE}'"
+        VOL_RESULT=$(curl -s --unix-socket /var/run/docker.sock \
+            -X POST -H "Content-Type: application/json" \
+            -d "$(jq -n --arg name "${TEST_VOL_NAME}" --arg dev "${MOUNT_SOURCE}" \
+                '{Name: $name, Driver: "local", DriverOpts: {type: "none", o: "bind", device: $dev}}')" \
+            "http://localhost/volumes/create" 2>/dev/null) || true
+        VOL_ERROR=$(echo "${VOL_RESULT}" | jq -r '.message // empty' 2>/dev/null) || true
+        if [[ -z "${VOL_ERROR}" ]]; then
+            HOST_DATA_PATH="${MOUNT_SOURCE}"
+            bashio::log.info "MOUNT_SOURCE works directly as host path: ${HOST_DATA_PATH}"
+        fi
+        curl -s --unix-socket /var/run/docker.sock \
+            -X DELETE "http://localhost/volumes/${TEST_VOL_NAME}" 2>/dev/null || true
+    fi
 fi
 
 if [[ -z "${HOST_DATA_PATH}" || "${HOST_DATA_PATH}" == "/" ]]; then
