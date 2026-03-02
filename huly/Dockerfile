@@ -3,7 +3,7 @@ FROM $BUILD_FROM
 
 # Build arguments for version
 ARG HULY_VERSION=0.7.375
-ENV HULY_VERSION=${HULY_VERSION}
+ENV HULY_VERSION=v${HULY_VERSION}
 
 # Install requirements
 # Upgrade first to resolve base image package version mismatches (e.g. libcrypto3/libssl3)

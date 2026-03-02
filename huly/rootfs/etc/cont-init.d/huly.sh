@@ -83,17 +83,33 @@ HOST_DATA_PATH=""
 MOUNT_SOURCE=""
 
 # Step 1: Get the /data mount source from container inspect.
-CONTAINER_ID="$(hostname)"
-bashio::log.info "Resolving host data path (container: ${CONTAINER_ID})..."
-INSPECT_JSON=$(curl -s --unix-socket /var/run/docker.sock \
-    "http://localhost/containers/${CONTAINER_ID}/json" 2>/dev/null) || true
-if [[ -n "${INSPECT_JSON}" ]]; then
-    bashio::log.debug "Docker API response received (${#INSPECT_JSON} bytes)"
-    bashio::log.debug "All mounts: $(echo "${INSPECT_JSON}" | jq -c '[.Mounts[] | {Source, Destination}]' 2>/dev/null)" || true
-    MOUNT_SOURCE=$(echo "${INSPECT_JSON}" \
-        | jq -r '.Mounts[] | select(.Destination == "/data") | .Source' 2>/dev/null) || true
-    bashio::log.debug "Extracted /data mount source: '${MOUNT_SOURCE}'"
-fi
+# Try multiple container identification methods since the ID format varies.
+# HAOS names addon containers addon_<hash>_<slug> but hostname is <hash>-<slug>.
+CONTAINER_HOSTNAME="$(hostname)"
+bashio::log.info "Resolving host data path (hostname: ${CONTAINER_HOSTNAME})..."
+
+# Build candidate container IDs:
+#   1. Full container ID from /proc/self/mountinfo (most reliable)
+#   2. HAOS addon naming: addon_<hash>_<slug> (hostname with - replaced by _)
+#   3. Plain hostname (fallback)
+PROC_CID=$(grep -oP 'docker/containers/\K[a-f0-9]{64}' /proc/self/mountinfo 2>/dev/null | head -1) || true
+HAOS_CID="addon_$(echo "${CONTAINER_HOSTNAME}" | sed 's/-/_/g')"
+
+for CONTAINER_ID in ${PROC_CID} ${HAOS_CID} ${CONTAINER_HOSTNAME}; do
+    bashio::log.debug "Trying container ID: ${CONTAINER_ID}"
+    INSPECT_JSON=$(curl -s --unix-socket /var/run/docker.sock \
+        "http://localhost/containers/${CONTAINER_ID}/json" 2>/dev/null) || true
+    if [[ -n "${INSPECT_JSON}" ]]; then
+        MOUNT_SOURCE=$(echo "${INSPECT_JSON}" \
+            | jq -r '.Mounts[] | select(.Destination == "/data") | .Source' 2>/dev/null) || true
+        if [[ -n "${MOUNT_SOURCE}" ]]; then
+            bashio::log.info "Identified container as: ${CONTAINER_ID}"
+            bashio::log.debug "All mounts: $(echo "${INSPECT_JSON}" | jq -c '[.Mounts[] | {Source, Destination}]' 2>/dev/null)" || true
+            bashio::log.debug "Extracted /data mount source: '${MOUNT_SOURCE}'"
+            break
+        fi
+    fi
+done
 
 # Step 2: Get DockerRootDir to derive the data partition prefix.
 DOCKER_ROOT_DIR=""
@@ -186,14 +202,14 @@ else
     bashio::log.info "No host_address configured, using default: ${HOST_ADDRESS}"
 fi
 
-# Determine HULY_VERSION from build arg or default
-HULY_VERSION="${HULY_VERSION:-0.7.375}"
+# Determine HULY_VERSION from build ENV or default (includes v prefix)
+HULY_VERSION="${HULY_VERSION:-v0.7.375}"
 
 # Write the .env file for docker compose
 bashio::log.info "Writing Huly environment configuration..."
 cat > /data/huly/.env << EOF
 # Huly version
-HULY_VERSION=v${HULY_VERSION}
+HULY_VERSION=${HULY_VERSION}
 DOCKER_NAME=huly_ha
 
 # Network

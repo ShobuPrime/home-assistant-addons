@@ -1,12 +1,17 @@
 # Changelog
 
-## Version 0.7.375-8 (2026-03-01)
+## Version 0.7.375-9 (2026-03-01)
 
 > Addon-level fixes only — not pulled from upstream Huly.
 
 ### Fixed
+- Fix image pull using wrong tag (`0.7.375` instead of `v0.7.375`). Container
+  `ENV HULY_VERSION` was overriding the `.env` file value because docker-compose
+  prioritizes host env vars. Now `ENV` includes the `v` prefix at build time.
+- Fix container inspect failing on HAOS. `hostname` returns `<hash>-<slug>` but
+  HAOS container names use `addon_<hash>_<slug>`. Now tries multiple ID formats:
+  full ID from `/proc`, HAOS naming convention, then hostname as fallback.
 - Fix images not updating on addon version change (version-aware `.images_pulled` marker)
-- Fix `HULY_VERSION` build arg not available at runtime (added `ENV` in Dockerfile)
 - Fix Elasticsearch data dir ownership (`chown 1000:1000` on startup)
 
 ### Changed
