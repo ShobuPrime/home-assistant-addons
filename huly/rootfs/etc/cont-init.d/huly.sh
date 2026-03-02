@@ -258,6 +258,12 @@ bashio::log.debug "$(grep -v -E '(PASSWORD|SECRET|PWD)=' /data/huly/.env)" || tr
 bashio::log.info "Setting up docker-compose configuration..."
 cp /opt/huly/compose.yaml.tmpl /data/huly/compose.yml
 
+# Clean up stale directory if Docker auto-created it from a failed bind mount
+if [[ -d /data/huly/nginx.conf ]]; then
+    bashio::log.warning "Removing stale nginx.conf directory (auto-created by Docker from failed mount)..."
+    rm -rf /data/huly/nginx.conf
+fi
+
 # Generate nginx config for routing
 bashio::log.info "Generating nginx configuration..."
 cat > /data/huly/nginx.conf << 'NGINXEOF'

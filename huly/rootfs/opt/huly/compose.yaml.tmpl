@@ -32,24 +32,6 @@ services:
     networks:
       - huly_net
 
-  cockroach-init:
-    image: cockroachdb/cockroach:latest-v24.2
-    depends_on:
-      cockroach:
-        condition: service_healthy
-    entrypoint: ["/bin/sh", "-c"]
-    command:
-      - |
-        /cockroach/cockroach sql --insecure --host=cockroach:26257 -e "
-        CREATE USER IF NOT EXISTS ${CR_USERNAME};
-        ALTER USER ${CR_USERNAME} WITH PASSWORD '${CR_USER_PASSWORD}';
-        CREATE DATABASE IF NOT EXISTS ${CR_DATABASE};
-        GRANT ALL ON DATABASE ${CR_DATABASE} TO ${CR_USERNAME};
-        " && echo 'CockroachDB user provisioned successfully'
-    restart: "no"
-    networks:
-      - huly_net
-
   redpanda:
     image: docker.redpanda.com/redpandadata/redpanda:v24.3.6
     command:
@@ -101,6 +83,7 @@ services:
 
   elastic:
     image: "elasticsearch:7.14.2"
+    user: "1000:1000"
     command: |
       /bin/sh -c "./bin/elasticsearch-plugin list | grep -q ingest-attachment || yes | ./bin/elasticsearch-plugin install --silent ingest-attachment;
       /usr/local/bin/docker-entrypoint.sh eswrapper"
@@ -148,8 +131,8 @@ services:
       - QUEUE_CONFIG=redpanda:9092
     restart: unless-stopped
     depends_on:
-      cockroach-init:
-        condition: service_completed_successfully
+      cockroach:
+        condition: service_healthy
       redpanda:
         condition: service_healthy
       minio:
@@ -185,8 +168,8 @@ services:
       - QUEUE_CONFIG=redpanda:9092
     restart: unless-stopped
     depends_on:
-      cockroach-init:
-        condition: service_completed_successfully
+      cockroach:
+        condition: service_healthy
     networks:
       - huly_net
 
@@ -204,8 +187,8 @@ services:
       - ACCOUNTS_DB_URL=${CR_DB_URL}
     restart: unless-stopped
     depends_on:
-      cockroach-init:
-        condition: service_completed_successfully
+      cockroach:
+        condition: service_healthy
     networks:
       - huly_net
 
@@ -264,8 +247,8 @@ services:
   kvs:
     image: hardcoreeng/hulykvs:${HULY_VERSION}
     depends_on:
-      cockroach-init:
-        condition: service_completed_successfully
+      cockroach:
+        condition: service_healthy
     environment:
       - HULY_DB_CONNECTION=${CR_DB_URL}
       - HULY_TOKEN_SECRET=${SECRET}
