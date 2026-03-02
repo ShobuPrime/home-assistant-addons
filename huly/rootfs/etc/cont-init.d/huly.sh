@@ -305,6 +305,8 @@ fi
 
 # Determine HULY_VERSION from build ENV or default (includes v prefix)
 HULY_VERSION="${HULY_VERSION:-v0.7.375}"
+# Desktop update channel uses the version without the v prefix
+DESKTOP_CHANNEL="${HULY_VERSION#v}"
 
 # Write the .env file for docker compose
 bashio::log.info "Writing Huly environment configuration..."
@@ -322,6 +324,7 @@ HTTP_BIND=
 TITLE=${TITLE:-Huly}
 DEFAULT_LANGUAGE=${DEFAULT_LANGUAGE:-en}
 LAST_NAME_FIRST=${LAST_NAME_FIRST:-true}
+DESKTOP_CHANNEL=${DESKTOP_CHANNEL}
 
 # CockroachDB
 CR_DATABASE=defaultdb

@@ -22,12 +22,6 @@ services:
     volumes:
       - ${VOLUME_CR_DATA_PATH}:/cockroach/cockroach-data
       - ${VOLUME_CR_CERTS_PATH:-cr_certs}:/cockroach/certs
-    healthcheck:
-      test: ['CMD-SHELL', 'curl -sf http://localhost:8080/health?ready=1 || exit 1']
-      interval: 10s
-      timeout: 5s
-      retries: 15
-      start_period: 30s
     restart: unless-stopped
     networks:
       - huly_net
@@ -128,7 +122,7 @@ services:
     restart: unless-stopped
     depends_on:
       cockroach:
-        condition: service_healthy
+        condition: service_started
       kafka:
         condition: service_healthy
       minio:
@@ -154,10 +148,10 @@ services:
       - SERVER_PORT=3000
       - SERVER_SECRET=${SECRET}
       - DB_URL=${CR_DB_URL}
-      - TRANSACTOR_URL=ws://transactor:3333
+      - TRANSACTOR_URL=ws://transactor:3333;ws://${HOST_ADDRESS}/_transactor
       - STORAGE_CONFIG=minio|minio?accessKey=${MINIO_ROOT_USER}&secretKey=${MINIO_ROOT_PASSWORD}
       - FRONT_URL=http://${HOST_ADDRESS}
-      - STATS_URL=http://stats:4900
+      - STATS_URL=http://${HOST_ADDRESS}/_stats
       - MODEL_ENABLED=*
       - ACCOUNTS_URL=http://${HOST_ADDRESS}/_accounts
       - ACCOUNT_PORT=3000
@@ -165,7 +159,7 @@ services:
     restart: unless-stopped
     depends_on:
       cockroach:
-        condition: service_healthy
+        condition: service_started
     networks:
       - huly_net
 
@@ -174,7 +168,7 @@ services:
     environment:
       - SERVER_SECRET=${SECRET}
       - DB_URL=${CR_DB_URL}
-      - TRANSACTOR_URL=ws://transactor:3333
+      - TRANSACTOR_URL=ws://transactor:3333;ws://${HOST_ADDRESS}/_transactor
       - STORAGE_CONFIG=minio|minio?accessKey=${MINIO_ROOT_USER}&secretKey=${MINIO_ROOT_PASSWORD}
       - MODEL_ENABLED=*
       - ACCOUNTS_URL=http://account:3000
@@ -184,7 +178,7 @@ services:
     restart: unless-stopped
     depends_on:
       cockroach:
-        condition: service_healthy
+        condition: service_started
     networks:
       - huly_net
 
@@ -208,6 +202,7 @@ services:
       - TITLE=${TITLE}
       - DEFAULT_LANGUAGE=${DEFAULT_LANGUAGE}
       - LAST_NAME_FIRST=${LAST_NAME_FIRST}
+      - DESKTOP_UPDATES_CHANNEL=${DESKTOP_CHANNEL}
     restart: unless-stopped
     networks:
       - huly_net
@@ -244,7 +239,7 @@ services:
     image: hardcoreeng/hulykvs:${HULY_VERSION}
     depends_on:
       cockroach:
-        condition: service_healthy
+        condition: service_started
     environment:
       - HULY_DB_CONNECTION=${CR_DB_URL}
       - HULY_TOKEN_SECRET=${SECRET}
