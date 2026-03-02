@@ -18,6 +18,10 @@ for dir in /data/huly /data/huly/cockroach /data/huly/cockroach-certs \
     bashio::log.debug "Created directory: ${dir}"
 done
 
+# Elasticsearch requires its data directory owned by uid 1000 (elasticsearch user)
+chown -R 1000:1000 /data/huly/elastic
+bashio::log.debug "Set /data/huly/elastic ownership to 1000:1000"
+
 # Generate secrets if they don't exist
 SECRETS_FILE="/data/huly/.secrets"
 if [[ ! -f "${SECRETS_FILE}" ]]; then
@@ -25,15 +29,27 @@ if [[ ! -f "${SECRETS_FILE}" ]]; then
     SECRET=$(openssl rand -hex 32)
     CR_USER_PASSWORD=$(openssl rand -hex 16)
     REDPANDA_ADMIN_PWD=$(openssl rand -hex 16)
+    MINIO_ROOT_USER=$(openssl rand -hex 8)
+    MINIO_ROOT_PASSWORD=$(openssl rand -hex 16)
     cat > "${SECRETS_FILE}" << EOF
 SECRET=${SECRET}
 CR_USER_PASSWORD=${CR_USER_PASSWORD}
 REDPANDA_ADMIN_PWD=${REDPANDA_ADMIN_PWD}
+MINIO_ROOT_USER=${MINIO_ROOT_USER}
+MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD}
 EOF
     chmod 600 "${SECRETS_FILE}"
     bashio::log.info "Secrets generated and saved"
 else
     bashio::log.info "Using existing secrets"
+    # Backward compatibility: add MinIO credentials if missing from older installs
+    if ! grep -q '^MINIO_ROOT_USER=' "${SECRETS_FILE}"; then
+        bashio::log.info "Adding MinIO credentials to existing secrets (using defaults for backward compatibility)..."
+        cat >> "${SECRETS_FILE}" << EOF
+MINIO_ROOT_USER=minioadmin
+MINIO_ROOT_PASSWORD=minioadmin
+EOF
+    fi
 fi
 
 # Check Docker socket
@@ -53,35 +69,22 @@ fi
 # spawned via Docker Compose are created by the HOST Docker daemon, so their
 # bind-mount paths must reference the real host path, not the container path.
 #
-# In HAOS the Docker inspect source for /data returns a path like
-# /supervisor/addons/data/<slug> — but that's relative to the data partition,
-# NOT the host root. The host root is read-only; the data partition is mounted
-# at e.g. /mnt/data. We discover the data partition mount point from Docker's
-# own DockerRootDir (typically /mnt/data/docker → prefix is /mnt/data).
+# In HAOS, docker inspect returns a path like /supervisor/addons/data/<slug>,
+# but the Docker daemon can't access /supervisor directly (the host root FS is
+# read-only and /supervisor is a mount that only exists in certain contexts).
+# The real host path requires a prefix like /mnt/data.
+#
+# Strategy: get the inspect path, build candidate prefixes from DockerRootDir,
+# then TEST each candidate by creating a temporary Docker volume with a bind
+# mount. The first one Docker can actually access is the correct host path.
 #
 # NOTE: We avoid Alpine's docker-cli entirely (segfaults on aarch64, docker/cli#4900).
 HOST_DATA_PATH=""
-DATA_PARTITION_PREFIX=""
+MOUNT_SOURCE=""
 
-# Step 1: Discover the HAOS data partition prefix from Docker's root dir.
-# DockerRootDir is typically /mnt/data/docker — strip the /docker suffix.
-bashio::log.info "Discovering HAOS data partition layout..."
-DOCKER_INFO=$(curl -s --unix-socket /var/run/docker.sock \
-    "http://localhost/info" 2>/dev/null) || true
-if [[ -n "${DOCKER_INFO}" ]]; then
-    DOCKER_ROOT_DIR=$(echo "${DOCKER_INFO}" | jq -r '.DockerRootDir // empty' 2>/dev/null) || true
-    bashio::log.debug "DockerRootDir: '${DOCKER_ROOT_DIR}'"
-    # Strip the trailing /docker to get the data partition mount point
-    if [[ "${DOCKER_ROOT_DIR}" == */docker ]]; then
-        DATA_PARTITION_PREFIX="${DOCKER_ROOT_DIR%/docker}"
-        bashio::log.debug "Data partition prefix: '${DATA_PARTITION_PREFIX}'"
-    fi
-fi
-
-# Step 2: Get the /data mount source from container inspect.
+# Step 1: Get the /data mount source from container inspect.
 CONTAINER_ID="$(hostname)"
 bashio::log.info "Resolving host data path (container: ${CONTAINER_ID})..."
-bashio::log.debug "Querying Docker API: /containers/${CONTAINER_ID}/json"
 INSPECT_JSON=$(curl -s --unix-socket /var/run/docker.sock \
     "http://localhost/containers/${CONTAINER_ID}/json" 2>/dev/null) || true
 if [[ -n "${INSPECT_JSON}" ]]; then
@@ -90,41 +93,67 @@ if [[ -n "${INSPECT_JSON}" ]]; then
     MOUNT_SOURCE=$(echo "${INSPECT_JSON}" \
         | jq -r '.Mounts[] | select(.Destination == "/data") | .Source' 2>/dev/null) || true
     bashio::log.debug "Extracted /data mount source: '${MOUNT_SOURCE}'"
-
-    if [[ -n "${MOUNT_SOURCE}" ]]; then
-        # If the mount source already starts with the data partition prefix, use as-is.
-        # Otherwise, prepend the prefix (HAOS stores paths relative to the data partition).
-        if [[ -n "${DATA_PARTITION_PREFIX}" && "${MOUNT_SOURCE}" != "${DATA_PARTITION_PREFIX}"* ]]; then
-            HOST_DATA_PATH="${DATA_PARTITION_PREFIX}${MOUNT_SOURCE}"
-            bashio::log.debug "Prepended data partition prefix: '${HOST_DATA_PATH}'"
-        else
-            HOST_DATA_PATH="${MOUNT_SOURCE}"
-        fi
-    fi
-else
-    bashio::log.debug "Docker API returned empty response"
 fi
 
-# Step 3: Parse /proc/self/mountinfo as fallback.
-if [[ -z "${HOST_DATA_PATH}" ]]; then
-    bashio::log.warning "Docker API lookup failed, trying /proc/self/mountinfo..."
-    bashio::log.debug "/proc/self/mountinfo /data entries:"
-    bashio::log.debug "$(grep ' /data ' /proc/self/mountinfo 2>/dev/null)" || true
-    MOUNT_ROOT=$(awk '$5 == "/data" { print $4; exit }' /proc/self/mountinfo 2>/dev/null) || true
-    bashio::log.debug "mountinfo root field: '${MOUNT_ROOT}'"
-    if [[ -n "${MOUNT_ROOT}" && "${MOUNT_ROOT}" != "/" ]]; then
-        if [[ -n "${DATA_PARTITION_PREFIX}" ]]; then
-            HOST_DATA_PATH="${DATA_PARTITION_PREFIX}${MOUNT_ROOT}"
-        else
-            HOST_DATA_PATH="${MOUNT_ROOT}"
-        fi
+# Step 2: Get DockerRootDir to derive the data partition prefix.
+DOCKER_ROOT_DIR=""
+DOCKER_INFO=$(curl -s --unix-socket /var/run/docker.sock \
+    "http://localhost/info" 2>/dev/null) || true
+if [[ -n "${DOCKER_INFO}" ]]; then
+    DOCKER_ROOT_DIR=$(echo "${DOCKER_INFO}" | jq -r '.DockerRootDir // empty' 2>/dev/null) || true
+    bashio::log.debug "DockerRootDir: '${DOCKER_ROOT_DIR}'"
+fi
+
+# Step 3: Build candidate paths and test each by creating a temporary volume.
+# A successful volume create with bind mount proves Docker daemon can access it.
+if [[ -n "${MOUNT_SOURCE}" ]]; then
+    # Build list of prefixes to try (most specific first)
+    PREFIXES=""
+    # From DockerRootDir: e.g. /mnt/data/docker → try /mnt/data
+    if [[ "${DOCKER_ROOT_DIR}" == */docker ]]; then
+        PREFIXES="${DOCKER_ROOT_DIR%/docker}"
     fi
+    # Also try /mnt/data (standard HAOS)
+    PREFIXES="${PREFIXES} /mnt/data"
+    # Try no prefix (in case the path works directly)
+    PREFIXES="${PREFIXES} "
+
+    TEST_VOL_NAME="huly_path_test_$$"
+    for prefix in ${PREFIXES}; do
+        CANDIDATE="${prefix}${MOUNT_SOURCE}"
+        bashio::log.debug "Testing candidate path: '${CANDIDATE}'"
+
+        # Try to create a Docker volume bound to this path
+        VOL_RESULT=$(curl -s --unix-socket /var/run/docker.sock \
+            -X POST -H "Content-Type: application/json" \
+            -d "$(jq -n --arg name "${TEST_VOL_NAME}" --arg dev "${CANDIDATE}" \
+                '{Name: $name, Driver: "local", DriverOpts: {type: "none", o: "bind", device: $dev}}')" \
+            "http://localhost/volumes/create" 2>/dev/null) || true
+
+        # Check if the volume was created (no error message)
+        VOL_ERROR=$(echo "${VOL_RESULT}" | jq -r '.message // empty' 2>/dev/null) || true
+        if [[ -z "${VOL_ERROR}" ]]; then
+            HOST_DATA_PATH="${CANDIDATE}"
+            bashio::log.info "Verified host data path: ${HOST_DATA_PATH}"
+            # Clean up test volume
+            curl -s --unix-socket /var/run/docker.sock \
+                -X DELETE "http://localhost/volumes/${TEST_VOL_NAME}" 2>/dev/null || true
+            break
+        else
+            bashio::log.debug "Path '${CANDIDATE}' failed: ${VOL_ERROR}"
+            # Clean up failed volume attempt just in case
+            curl -s --unix-socket /var/run/docker.sock \
+                -X DELETE "http://localhost/volumes/${TEST_VOL_NAME}" 2>/dev/null || true
+        fi
+    done
 fi
 
 if [[ -z "${HOST_DATA_PATH}" || "${HOST_DATA_PATH}" == "/" ]]; then
     bashio::log.error "Could not determine host path for /data — volume mounts will fail."
-    bashio::log.error "Falling back to /data (will only work if /data is a real host path)."
-    HOST_DATA_PATH="/data"
+    bashio::log.error "Mount source from inspect: '${MOUNT_SOURCE}'"
+    bashio::log.error "DockerRootDir: '${DOCKER_ROOT_DIR}'"
+    bashio::log.error "Falling back to mount source path (may not work)."
+    HOST_DATA_PATH="${MOUNT_SOURCE:-/data}"
 else
     bashio::log.info "Resolved host data path: ${HOST_DATA_PATH}"
 fi
@@ -189,6 +218,10 @@ REDPANDA_ADMIN_PWD=${REDPANDA_ADMIN_PWD}
 
 # Secret
 SECRET=${SECRET}
+
+# MinIO
+MINIO_ROOT_USER=${MINIO_ROOT_USER}
+MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD}
 
 # Volumes (host-side paths for bind mounts into sub-containers)
 VOLUME_CR_DATA_PATH=${HOST_DATA_PATH}/huly/cockroach
