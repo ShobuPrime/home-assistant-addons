@@ -1,5 +1,25 @@
 # Changelog
 
+## Version 0.7.375-10 (2026-03-01)
+
+> Addon-level fixes only — not pulled from upstream Huly.
+
+### Fixed
+- Fix services crashing on startup with `ECONNREFUSED` by adding a health check
+  to CockroachDB and changing all dependents (`kvs`, `account`, `workspace`,
+  `transactor`) from `service_started` to `service_healthy`. Services now wait
+  until CockroachDB is actually accepting connections before starting.
+- Fix `front` service crash-looping with "please provide gmail url" by setting
+  `GMAIL_URL=` (empty) in the front service environment. Huly requires this
+  variable to be defined even when Gmail integration is unused.
+- Fix Redpanda health check lacking `start_period`, causing dependents to give up
+  before Redpanda finishes initializing on resource-constrained systems (e.g.
+  Home Assistant Yellow with aarch64).
+- Fix orphaned containers persisting after addon stop/uninstall. The finish
+  script now uses `--remove-orphans` on compose down, then queries the Docker API
+  for any remaining containers in the `huly_ha` project and force-removes them.
+  Also cleans up the compose network if left behind.
+
 ## Version 0.7.375-9 (2026-03-01)
 
 > Addon-level fixes only — not pulled from upstream Huly.

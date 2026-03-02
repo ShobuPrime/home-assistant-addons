@@ -5,8 +5,47 @@
 # ==============================================================================
 bashio::log.info "Stopping Huly stack..."
 bashio::log.debug "Finish script called with exit code: ${1:-unknown}"
-cd /data/huly 2>/dev/null && /usr/local/bin/docker-compose down --timeout 30 2>/dev/null
-bashio::log.debug "docker-compose down completed"
+
+# Stop all compose services and remove containers/networks.
+# Use --remove-orphans to catch any containers that may have been left behind
+# from a previous configuration or interrupted shutdown.
+if cd /data/huly 2>/dev/null; then
+    /usr/local/bin/docker-compose down --remove-orphans --timeout 30 2>&1 \
+        | while IFS= read -r line; do bashio::log.debug "${line}"; done
+    bashio::log.debug "docker-compose down completed"
+else
+    bashio::log.warning "Could not access /data/huly for shutdown"
+fi
+
+# Safety net: kill any containers still running in the huly_ha project.
+# This handles the case where docker-compose down didn't fully clean up,
+# e.g. if the compose file was modified between start and stop.
+REMAINING=$(curl -s --unix-socket /var/run/docker.sock \
+    "http://localhost/containers/json?filters=%7B%22label%22%3A%5B%22com.docker.compose.project%3Dhuly_ha%22%5D%7D" \
+    2>/dev/null | jq -r '.[].Id // empty' 2>/dev/null) || true
+
+if [[ -n "${REMAINING}" ]]; then
+    bashio::log.warning "Found orphaned Huly containers after compose down, force removing..."
+    for cid in ${REMAINING}; do
+        bashio::log.debug "Stopping container ${cid:0:12}..."
+        curl -s --unix-socket /var/run/docker.sock \
+            -X POST "http://localhost/containers/${cid}/stop?t=10" 2>/dev/null || true
+        curl -s --unix-socket /var/run/docker.sock \
+            -X DELETE "http://localhost/containers/${cid}?force=true" 2>/dev/null || true
+    done
+    bashio::log.debug "Orphaned container cleanup complete"
+fi
+
+# Clean up the compose network if it still exists
+NETWORK_ID=$(curl -s --unix-socket /var/run/docker.sock \
+    "http://localhost/networks?filters=%7B%22name%22%3A%5B%22huly_ha_huly_net%22%5D%7D" \
+    2>/dev/null | jq -r '.[0].Id // empty' 2>/dev/null) || true
+
+if [[ -n "${NETWORK_ID}" ]]; then
+    bashio::log.debug "Removing leftover network huly_ha_huly_net..."
+    curl -s --unix-socket /var/run/docker.sock \
+        -X DELETE "http://localhost/networks/${NETWORK_ID}" 2>/dev/null || true
+fi
 
 if [[ "${1}" -ne 0 ]] && [[ "${1}" -ne 256 ]]; then
     bashio::log.warning "Huly crashed with exit code ${1}. Respawning..."
