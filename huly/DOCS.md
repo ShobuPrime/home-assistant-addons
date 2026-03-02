@@ -51,7 +51,6 @@ Set these values if you want credentials to survive an add-on reinstall without 
 |---|---|
 | `server_secret` | Huly internal server secret (hex string) |
 | `cockroachdb_password` | CockroachDB `selfhost` user password |
-| `redpanda_admin_password` | Redpanda `superadmin` user password |
 | `minio_root_user` | MinIO root access key |
 | `minio_root_password` | MinIO root secret key |
 
@@ -93,7 +92,7 @@ Huly runs 14 internal Docker services, all orchestrated via Docker Compose:
 - **CockroachDB**: Distributed SQL database for application data
 - **Elasticsearch**: Full-text search engine for content indexing
 - **MinIO**: S3-compatible object storage for files and attachments
-- **Redpanda**: Event streaming platform (Kafka-compatible)
+- **Kafka**: Event streaming platform (KRaft mode, no ZooKeeper)
 - **Account**: User authentication and workspace management
 - **Front**: Web application frontend
 - **Collaborator**: Real-time collaboration engine
@@ -111,7 +110,7 @@ All services communicate over an internal Docker network. Only nginx (port 4859)
 - **CockroachDB data**: Stored in `/data/huly/cockroach`
 - **Elasticsearch data**: Stored in `/data/huly/elastic`
 - **MinIO data**: Stored in `/data/huly/minio`
-- **Redpanda data**: Stored in `/data/huly/redpanda`
+- **Kafka data**: Stored in `/data/huly/kafka`
 - **Huly configuration**: Stored in `/data/huly/config`
 - **Generated secrets**: Stored in `/data/huly/secrets`
 

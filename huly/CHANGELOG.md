@@ -1,5 +1,20 @@
 # Changelog
 
+## Version 0.7.375-16 (2026-03-02)
+
+> Addon-level fixes only — not pulled from upstream Huly.
+
+### Changed
+- Replace Redpanda with Apache Kafka (KRaft mode) for event streaming. Redpanda's
+  Seastar C++ framework crashes with SIGILL (exit code 133) on HAOS kernels using
+  16K page sizes (Raspberry Pi CM5/Pi5). Kafka is JVM-based and has no native page
+  size constraints. Huly's QUEUE_CONFIG uses the standard Kafka wire protocol, so
+  this is a transparent drop-in replacement.
+- Remove `redpanda_admin_password` configuration option (Kafka KRaft single-node
+  does not use authentication on internal networks).
+- Data directory changed from `/data/huly/redpanda` to `/data/huly/kafka`. Old
+  Redpanda data is automatically cleaned up on first startup after upgrade.
+
 ## Version 0.7.375-15 (2026-03-02)
 
 > Addon-level fixes only — not pulled from upstream Huly.

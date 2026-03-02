@@ -1,6 +1,6 @@
 name: "Huly"
 description: "All-in-one project management platform - alternative to Linear, Jira, Slack, and Notion"
-version: "0.7.375-15"
+version: "0.7.375-16"
 slug: "huly"
 init: false
 ingress: true
@@ -35,7 +35,6 @@ options:
   last_name_first: true
   server_secret: ""
   cockroachdb_password: ""
-  redpanda_admin_password: ""
   minio_root_user: ""
   minio_root_password: ""
 schema:
@@ -46,6 +45,5 @@ schema:
   last_name_first: bool?
   server_secret: password?
   cockroachdb_password: password?
-  redpanda_admin_password: password?
   minio_root_user: str?
   minio_root_password: password?

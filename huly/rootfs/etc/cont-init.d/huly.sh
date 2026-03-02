@@ -12,11 +12,17 @@ bashio::log.debug "Kernel: $(uname -r)"
 # Create data directories for all Huly services
 bashio::log.info "Creating data directories..."
 for dir in /data/huly /data/huly/cockroach /data/huly/cockroach-certs \
-           /data/huly/elastic /data/huly/minio /data/huly/redpanda; do
+           /data/huly/elastic /data/huly/minio /data/huly/kafka; do
     mkdir -p "${dir}"
     chmod 755 "${dir}"
     bashio::log.debug "Created directory: ${dir}"
 done
+
+# One-time migration: clean up old Redpanda data directory (replaced by Kafka)
+if [[ -d /data/huly/redpanda ]]; then
+    bashio::log.info "Cleaning up legacy Redpanda data directory (replaced by Kafka)..."
+    rm -rf /data/huly/redpanda
+fi
 
 # ---------------------------------------------------------------------------
 # Resolve credentials: config UI value > existing secrets file > auto-generate
@@ -26,7 +32,6 @@ SECRETS_FILE="/data/huly/.secrets"
 # Read user-supplied credentials from the HA config UI (empty string = not set)
 CFG_SECRET=$(bashio::config 'server_secret')
 CFG_CR_PASSWORD=$(bashio::config 'cockroachdb_password')
-CFG_REDPANDA_PWD=$(bashio::config 'redpanda_admin_password')
 CFG_MINIO_USER=$(bashio::config 'minio_root_user')
 CFG_MINIO_PWD=$(bashio::config 'minio_root_password')
 
@@ -39,7 +44,7 @@ fi
 
 # Check whether ANY config password was explicitly set by the user
 HAS_CONFIG_PASSWORDS=false
-for val in "${CFG_SECRET}" "${CFG_CR_PASSWORD}" "${CFG_REDPANDA_PWD}" \
+for val in "${CFG_SECRET}" "${CFG_CR_PASSWORD}" \
            "${CFG_MINIO_USER}" "${CFG_MINIO_PWD}"; do
     if bashio::var.has_value "${val}"; then
         HAS_CONFIG_PASSWORDS=true
@@ -67,7 +72,7 @@ fi
 
 if [[ "${NEEDS_DATA_WIPE}" == "true" ]]; then
     bashio::log.warning "Wiping stale service data for fresh initialization..."
-    for dir in cockroach cockroach-certs elastic minio redpanda; do
+    for dir in cockroach cockroach-certs elastic minio kafka; do
         rm -rf "/data/huly/${dir:?}"/*
         bashio::log.debug "Cleared /data/huly/${dir}"
     done
@@ -89,7 +94,6 @@ resolve_credential() {
 
 SECRET=$(resolve_credential "${CFG_SECRET}" "${SECRET:-}" "openssl rand -hex 32")
 CR_USER_PASSWORD=$(resolve_credential "${CFG_CR_PASSWORD}" "${CR_USER_PASSWORD:-}" "openssl rand -hex 16")
-REDPANDA_ADMIN_PWD=$(resolve_credential "${CFG_REDPANDA_PWD}" "${REDPANDA_ADMIN_PWD:-}" "openssl rand -hex 16")
 MINIO_ROOT_USER=$(resolve_credential "${CFG_MINIO_USER}" "${MINIO_ROOT_USER:-}" "openssl rand -hex 8")
 MINIO_ROOT_PASSWORD=$(resolve_credential "${CFG_MINIO_PWD}" "${MINIO_ROOT_PASSWORD:-}" "openssl rand -hex 16")
 
@@ -108,7 +112,6 @@ fi
 cat > "${SECRETS_FILE}" << EOF
 SECRET=${SECRET}
 CR_USER_PASSWORD=${CR_USER_PASSWORD}
-REDPANDA_ADMIN_PWD=${REDPANDA_ADMIN_PWD}
 MINIO_ROOT_USER=${MINIO_ROOT_USER}
 MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD}
 EOF
@@ -326,10 +329,6 @@ CR_USERNAME=selfhost
 CR_USER_PASSWORD=${CR_USER_PASSWORD}
 CR_DB_URL=postgres://selfhost:${CR_USER_PASSWORD}@cockroach:26257/defaultdb
 
-# Redpanda
-REDPANDA_ADMIN_USER=superadmin
-REDPANDA_ADMIN_PWD=${REDPANDA_ADMIN_PWD}
-
 # Secret
 SECRET=${SECRET}
 
@@ -342,7 +341,7 @@ VOLUME_CR_DATA_PATH=${HOST_DATA_PATH}/huly/cockroach
 VOLUME_CR_CERTS_PATH=${HOST_DATA_PATH}/huly/cockroach-certs
 VOLUME_ELASTIC_PATH=${HOST_DATA_PATH}/huly/elastic
 VOLUME_FILES_PATH=${HOST_DATA_PATH}/huly/minio
-VOLUME_REDPANDA_PATH=${HOST_DATA_PATH}/huly/redpanda
+VOLUME_KAFKA_PATH=${HOST_DATA_PATH}/huly/kafka
 
 # Nginx config (host-side path for bind mount)
 NGINX_CONF_PATH=${HOST_DATA_PATH}/huly/nginx.conf
