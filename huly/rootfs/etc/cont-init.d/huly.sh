@@ -25,6 +25,19 @@ bashio::log.debug "Set /data/huly/elastic ownership to 1000:1000"
 # Generate secrets if they don't exist
 SECRETS_FILE="/data/huly/.secrets"
 if [[ ! -f "${SECRETS_FILE}" ]]; then
+    # If databases already have data but secrets file is missing, we have a
+    # credential mismatch (e.g., addon was reinstalled or secrets were lost).
+    # CockroachDB only provisions COCKROACH_USER/PASSWORD on first init with
+    # an empty data directory — stale data with old credentials must be wiped.
+    if [[ -d /data/huly/cockroach ]] && [[ -n "$(ls -A /data/huly/cockroach 2>/dev/null)" ]]; then
+        bashio::log.warning "Secrets file missing but database data exists — credential mismatch detected."
+        bashio::log.warning "Wiping stale service data for fresh initialization..."
+        for dir in cockroach cockroach-certs elastic minio redpanda; do
+            rm -rf "/data/huly/${dir:?}"/*
+            bashio::log.debug "Cleared /data/huly/${dir}"
+        done
+    fi
+
     bashio::log.info "Generating Huly secrets..."
     SECRET=$(openssl rand -hex 32)
     CR_USER_PASSWORD=$(openssl rand -hex 16)
