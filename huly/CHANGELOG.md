@@ -1,19 +1,18 @@
 # Changelog
 
-## Version 0.7.375-6 (2026-03-01)
+## Version 0.7.375-7 (2026-03-01)
+
+### Fixed
+- Fix "read-only file system" error for volume mounts on HAOS. Docker inspect
+  returns paths like `/supervisor/...` which the Docker daemon can't access
+  directly (host root is read-only). Now builds candidate paths with prefixes
+  derived from `DockerRootDir` and `/mnt/data`, then **tests each candidate**
+  by creating a temporary Docker volume to verify the daemon can access it.
+  Uses the first verified path for all bind mounts.
 
 ### Added
 - Verbose debug logging throughout all scripts (init, run, finish). Set
-  `log_level: debug` in the addon config to see detailed diagnostic output
-  including Docker API responses, mount info, .env contents, and compose state.
-
-### Fixed
-- Fix init crash (exit 22) when resolving host data path. The Docker API curl
-  call now handles errors gracefully with a `/proc/self/mountinfo` fallback.
-- Fix "read-only file system" error for volume mounts on HAOS. Docker inspect
-  returns paths relative to the HAOS data partition (e.g. `/supervisor/...`),
-  not the actual host root. Now discovers the data partition mount prefix from
-  Docker's `DockerRootDir` and prepends it (e.g. `/mnt/data/supervisor/...`).
+  `log_level: debug` in the addon config to see detailed diagnostic output.
 
 ## Version 0.7.375-4 (2026-03-01)
 
