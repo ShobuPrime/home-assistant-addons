@@ -33,9 +33,19 @@ options:
   title: "Huly"
   default_language: "en"
   last_name_first: true
+  server_secret: ""
+  cockroachdb_password: ""
+  redpanda_admin_password: ""
+  minio_root_user: ""
+  minio_root_password: ""
 schema:
   log_level: list(trace|debug|info|warning|error|fatal)?
   host_address: str
   title: str?
   default_language: str?
   last_name_first: bool?
+  server_secret: password?
+  cockroachdb_password: password?
+  redpanda_admin_password: password?
+  minio_root_user: str?
+  minio_root_password: password?

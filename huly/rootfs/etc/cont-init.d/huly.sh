@@ -22,48 +22,77 @@ done
 chown -R 1000:1000 /data/huly/elastic
 bashio::log.debug "Set /data/huly/elastic ownership to 1000:1000"
 
-# Generate secrets if they don't exist
+# ---------------------------------------------------------------------------
+# Resolve credentials: config UI value > existing secrets file > auto-generate
+# ---------------------------------------------------------------------------
 SECRETS_FILE="/data/huly/.secrets"
-if [[ ! -f "${SECRETS_FILE}" ]]; then
-    # If databases already have data but secrets file is missing, we have a
-    # credential mismatch (e.g., addon was reinstalled or secrets were lost).
-    # CockroachDB only provisions COCKROACH_USER/PASSWORD on first init with
-    # an empty data directory — stale data with old credentials must be wiped.
+
+# Read user-supplied credentials from the HA config UI (empty string = not set)
+CFG_SECRET=$(bashio::config 'server_secret')
+CFG_CR_PASSWORD=$(bashio::config 'cockroachdb_password')
+CFG_REDPANDA_PWD=$(bashio::config 'redpanda_admin_password')
+CFG_MINIO_USER=$(bashio::config 'minio_root_user')
+CFG_MINIO_PWD=$(bashio::config 'minio_root_password')
+
+# Source existing secrets file (provides fallback values for anything not in config)
+if [[ -f "${SECRETS_FILE}" ]]; then
+    bashio::log.info "Loading existing secrets file"
+    # shellcheck source=/dev/null
+    source "${SECRETS_FILE}"
+fi
+
+# Check whether ANY config password was explicitly set by the user
+HAS_CONFIG_PASSWORDS=false
+for val in "${CFG_SECRET}" "${CFG_CR_PASSWORD}" "${CFG_REDPANDA_PWD}" \
+           "${CFG_MINIO_USER}" "${CFG_MINIO_PWD}"; do
+    if bashio::var.has_value "${val}"; then
+        HAS_CONFIG_PASSWORDS=true
+        break
+    fi
+done
+
+# Stale-data safety net: if there is NO secrets file AND NO config passwords
+# but CockroachDB data already exists, we have an unrecoverable credential
+# mismatch — wipe service data so everything re-initialises cleanly.
+if [[ ! -f "${SECRETS_FILE}" ]] && [[ "${HAS_CONFIG_PASSWORDS}" == "false" ]]; then
     if [[ -d /data/huly/cockroach ]] && [[ -n "$(ls -A /data/huly/cockroach 2>/dev/null)" ]]; then
-        bashio::log.warning "Secrets file missing but database data exists — credential mismatch detected."
+        bashio::log.warning "Secrets file missing, no config passwords set, but database data exists — credential mismatch detected."
         bashio::log.warning "Wiping stale service data for fresh initialization..."
         for dir in cockroach cockroach-certs elastic minio redpanda; do
             rm -rf "/data/huly/${dir:?}"/*
             bashio::log.debug "Cleared /data/huly/${dir}"
         done
     fi
+fi
 
-    bashio::log.info "Generating Huly secrets..."
-    SECRET=$(openssl rand -hex 32)
-    CR_USER_PASSWORD=$(openssl rand -hex 16)
-    REDPANDA_ADMIN_PWD=$(openssl rand -hex 16)
-    MINIO_ROOT_USER=$(openssl rand -hex 8)
-    MINIO_ROOT_PASSWORD=$(openssl rand -hex 16)
-    cat > "${SECRETS_FILE}" << EOF
+# Resolve each credential: config value > existing secret > auto-generate
+resolve_credential() {
+    local cfg_val="$1" existing_val="$2" generator="$3"
+    if bashio::var.has_value "${cfg_val}"; then
+        echo "${cfg_val}"
+    elif bashio::var.has_value "${existing_val}"; then
+        echo "${existing_val}"
+    else
+        eval "${generator}"
+    fi
+}
+
+SECRET=$(resolve_credential "${CFG_SECRET}" "${SECRET:-}" "openssl rand -hex 32")
+CR_USER_PASSWORD=$(resolve_credential "${CFG_CR_PASSWORD}" "${CR_USER_PASSWORD:-}" "openssl rand -hex 16")
+REDPANDA_ADMIN_PWD=$(resolve_credential "${CFG_REDPANDA_PWD}" "${REDPANDA_ADMIN_PWD:-}" "openssl rand -hex 16")
+MINIO_ROOT_USER=$(resolve_credential "${CFG_MINIO_USER}" "${MINIO_ROOT_USER:-}" "openssl rand -hex 8")
+MINIO_ROOT_PASSWORD=$(resolve_credential "${CFG_MINIO_PWD}" "${MINIO_ROOT_PASSWORD:-}" "openssl rand -hex 16")
+
+# Persist resolved values so subsequent restarts (without config changes) reuse them
+cat > "${SECRETS_FILE}" << EOF
 SECRET=${SECRET}
 CR_USER_PASSWORD=${CR_USER_PASSWORD}
 REDPANDA_ADMIN_PWD=${REDPANDA_ADMIN_PWD}
 MINIO_ROOT_USER=${MINIO_ROOT_USER}
 MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD}
 EOF
-    chmod 600 "${SECRETS_FILE}"
-    bashio::log.info "Secrets generated and saved"
-else
-    bashio::log.info "Using existing secrets"
-    # Backward compatibility: add MinIO credentials if missing from older installs
-    if ! grep -q '^MINIO_ROOT_USER=' "${SECRETS_FILE}"; then
-        bashio::log.info "Adding MinIO credentials to existing secrets (using defaults for backward compatibility)..."
-        cat >> "${SECRETS_FILE}" << EOF
-MINIO_ROOT_USER=minioadmin
-MINIO_ROOT_PASSWORD=minioadmin
-EOF
-    fi
-fi
+chmod 600 "${SECRETS_FILE}"
+bashio::log.info "Credentials resolved and saved"
 
 # Check Docker socket
 if [[ -S /var/run/docker.sock ]]; then
@@ -202,10 +231,6 @@ HOST_ADDRESS=$(bashio::config 'host_address')
 TITLE=$(bashio::config 'title')
 DEFAULT_LANGUAGE=$(bashio::config 'default_language')
 LAST_NAME_FIRST=$(bashio::config 'last_name_first')
-
-# Source secrets
-# shellcheck source=/dev/null
-source "${SECRETS_FILE}"
 
 # Determine HOST_ADDRESS - use config value or fall back to default
 if bashio::var.has_value "${HOST_ADDRESS}"; then

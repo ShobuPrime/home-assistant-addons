@@ -41,6 +41,22 @@ Controls name display ordering across the platform.
 - `true` (default): Display as "Last First"
 - `false`: Display as "First Last"
 
+### Credentials
+
+All credential fields are optional. Leave them blank and the add-on will auto-generate secure random values on first startup.
+
+Set these values if you want credentials to survive an add-on reinstall without losing data. Home Assistant Supervisor stores config values independently of `/data`, so they persist even when the add-on is removed and re-installed — whereas auto-generated secrets stored in `/data` may be lost.
+
+| Option | Description |
+|---|---|
+| `server_secret` | Huly internal server secret (hex string) |
+| `cockroachdb_password` | CockroachDB `selfhost` user password |
+| `redpanda_admin_password` | Redpanda `superadmin` user password |
+| `minio_root_user` | MinIO root access key |
+| `minio_root_password` | MinIO root secret key |
+
+> **Warning**: Changing a credential after the initial setup will cause an authentication mismatch with the existing data. If you need to change passwords after data has been created, you must stop the add-on, wipe the corresponding service data directory under `/data/huly/`, and restart.
+
 ## Access Methods
 
 1. **Via Sidebar**: Click the Huly icon in Home Assistant (uses ingress)
