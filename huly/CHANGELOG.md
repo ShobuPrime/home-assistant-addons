@@ -1,5 +1,18 @@
 # Changelog
 
+## Version 0.7.375-8 (2026-03-01)
+
+> Addon-level fixes only — not pulled from upstream Huly.
+
+### Fixed
+- Fix images not updating on addon version change (version-aware `.images_pulled` marker)
+- Fix `HULY_VERSION` build arg not available at runtime (added `ENV` in Dockerfile)
+- Fix Elasticsearch data dir ownership (`chown 1000:1000` on startup)
+
+### Changed
+- Generate random MinIO credentials on first install instead of hardcoded defaults
+- Add `--timeout 30` to `docker-compose down` for reliable shutdown
+
 ## Version 0.7.375-7 (2026-03-01)
 
 ### Fixed

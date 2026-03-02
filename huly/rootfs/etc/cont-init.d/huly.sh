@@ -18,6 +18,10 @@ for dir in /data/huly /data/huly/cockroach /data/huly/cockroach-certs \
     bashio::log.debug "Created directory: ${dir}"
 done
 
+# Elasticsearch requires its data directory owned by uid 1000 (elasticsearch user)
+chown -R 1000:1000 /data/huly/elastic
+bashio::log.debug "Set /data/huly/elastic ownership to 1000:1000"
+
 # Generate secrets if they don't exist
 SECRETS_FILE="/data/huly/.secrets"
 if [[ ! -f "${SECRETS_FILE}" ]]; then
@@ -25,15 +29,27 @@ if [[ ! -f "${SECRETS_FILE}" ]]; then
     SECRET=$(openssl rand -hex 32)
     CR_USER_PASSWORD=$(openssl rand -hex 16)
     REDPANDA_ADMIN_PWD=$(openssl rand -hex 16)
+    MINIO_ROOT_USER=$(openssl rand -hex 8)
+    MINIO_ROOT_PASSWORD=$(openssl rand -hex 16)
     cat > "${SECRETS_FILE}" << EOF
 SECRET=${SECRET}
 CR_USER_PASSWORD=${CR_USER_PASSWORD}
 REDPANDA_ADMIN_PWD=${REDPANDA_ADMIN_PWD}
+MINIO_ROOT_USER=${MINIO_ROOT_USER}
+MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD}
 EOF
     chmod 600 "${SECRETS_FILE}"
     bashio::log.info "Secrets generated and saved"
 else
     bashio::log.info "Using existing secrets"
+    # Backward compatibility: add MinIO credentials if missing from older installs
+    if ! grep -q '^MINIO_ROOT_USER=' "${SECRETS_FILE}"; then
+        bashio::log.info "Adding MinIO credentials to existing secrets (using defaults for backward compatibility)..."
+        cat >> "${SECRETS_FILE}" << EOF
+MINIO_ROOT_USER=minioadmin
+MINIO_ROOT_PASSWORD=minioadmin
+EOF
+    fi
 fi
 
 # Check Docker socket
@@ -202,6 +218,10 @@ REDPANDA_ADMIN_PWD=${REDPANDA_ADMIN_PWD}
 
 # Secret
 SECRET=${SECRET}
+
+# MinIO
+MINIO_ROOT_USER=${MINIO_ROOT_USER}
+MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD}
 
 # Volumes (host-side paths for bind mounts into sub-containers)
 VOLUME_CR_DATA_PATH=${HOST_DATA_PATH}/huly/cockroach
