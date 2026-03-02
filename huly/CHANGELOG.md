@@ -1,5 +1,22 @@
 # Changelog
 
+## Version 0.7.375-12 (2026-03-01)
+
+> Addon-level fixes only — not pulled from upstream Huly.
+
+### Changed
+- Increase HA Supervisor stop timeout from 10s to 120s (`timeout: 120` in
+  config.yaml). The Huly stack has 14+ containers that need graceful shutdown;
+  10 seconds was insufficient, causing SIGKILL before cleanup completed.
+- Increase S6-overlay service gracetime to 90s (`S6_SERVICES_GRACETIME=90000`)
+  and finish script timeout to 90s (`timeout-finish`). Both fit within the
+  Supervisor's 120s window.
+- Rewrite shutdown to use parallel container stop via Docker API. All containers
+  receive SIGTERM simultaneously (backgrounded curl to `/containers/{id}/stop`),
+  reducing total shutdown from ~N*20s (sequential) to ~20s (parallel). After all
+  containers stop, `docker-compose down` runs to clean up networks. A final
+  safety net force-removes any survivors.
+
 ## Version 0.7.375-11 (2026-03-01)
 
 > Addon-level fixes only — not pulled from upstream Huly.

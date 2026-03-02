@@ -5,6 +5,14 @@ FROM $BUILD_FROM
 ARG HULY_VERSION=0.7.375
 ENV HULY_VERSION=v${HULY_VERSION}
 
+# S6-overlay shutdown timeouts (in milliseconds).
+# The Huly stack has 14+ containers that need graceful shutdown.
+# S6_SERVICES_GRACETIME: time to wait for docker-compose to exit after SIGTERM
+# S6_KILL_FINISH_MAXTIME: time allowed for cont-finish.d scripts
+# These must fit within the config.yaml timeout (120s) sent by the Supervisor.
+ENV S6_SERVICES_GRACETIME=90000 \
+    S6_KILL_FINISH_MAXTIME=90000
+
 # Install requirements
 # Upgrade first to resolve base image package version mismatches (e.g. libcrypto3/libssl3)
 RUN \

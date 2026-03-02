@@ -1,6 +1,6 @@
 name: "Huly"
 description: "All-in-one project management platform - alternative to Linear, Jira, Slack, and Notion"
-version: "0.7.375-11"
+version: "0.7.375-12"
 slug: "huly"
 init: false
 ingress: true
@@ -12,6 +12,7 @@ arch:
   - aarch64
   - amd64
 startup: application
+timeout: 120
 boot: auto
 watchdog: tcp://[HOST]:[PORT:8087]/
 ports:
