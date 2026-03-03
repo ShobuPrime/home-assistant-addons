@@ -1,5 +1,27 @@
 # Changelog
 
+## [1.0.19] - 2026-03-03
+
+### Changed
+- Updated Dockhand to version 1.0.19
+
+Release date: 2026-03-01
+
+Changes:
+{
+  "type": "feature",
+  "text": "Inline logs panel on stacks page — view container logs without leaving the page"
+}
+{
+  "type": "feature",
+  "text": "Make ports column sortable in containers grid"
+}
+{
+  "type": "feature",
+
+---
+
+
 ## [1.0.18] - 2026-02-19
 
 ### Changed
