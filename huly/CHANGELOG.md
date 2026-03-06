@@ -1,5 +1,31 @@
 # Changelog
 
+## Version 0.7.375 (2026-03-06)
+
+Hulypulse in-memory config (#271)
+
+Signed-off-by: Artem Savchenko <armisav@gmail.com>
+Update to 0.7.375 version (#270)
+
+Signed-off-by: Artem Savchenko <armisav@gmail.com>
+Add instructions to deploy HulyPulse (#267)
+
+* Add instructions to deploy pulse service
+
+Signed-off-by: Artem Savchenko <armisav@gmail.com>
+
+* Fix proxy
+
+Signed-off-by: Artem Savchenko <armisav@gmail.com>
+
+---------
+
+Signed-off-by: Artem Savchenko <armisav@gmail.com>
+Add note how to stop containers (#264)
+
+---
+
+
 ## Version 0.7.375-16 (2026-03-02)
 
 > Addon-level fixes only — not pulled from upstream Huly.
