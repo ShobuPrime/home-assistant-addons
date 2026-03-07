@@ -1,5 +1,27 @@
 # Changelog
 
+## [1.0.20] - 2026-03-07
+
+### Changed
+- Updated Dockhand to version 1.0.20
+
+Release date: 2026-03-02
+
+Changes:
+{
+  "type": "fix",
+  "text": "regression on Synology DSM"
+}
+{
+  "type": "fix",
+  "text": "Fix ARM64 regression: Go collector crashing on Raspberry Pi and other ARM devices"
+}
+{
+  "type": "fix",
+
+---
+
+
 ## [1.0.18] - 2026-02-19
 
 ### Changed
