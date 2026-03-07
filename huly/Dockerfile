@@ -2,7 +2,7 @@ ARG BUILD_FROM=ghcr.io/hassio-addons/base:20.0.1
 FROM $BUILD_FROM
 
 # Build arguments for version
-ARG HULY_VERSION=0.7.375
+ARG HULY_VERSION=0.7.382
 ENV HULY_VERSION=v${HULY_VERSION}
 
 # S6-overlay shutdown timeouts (in milliseconds).
