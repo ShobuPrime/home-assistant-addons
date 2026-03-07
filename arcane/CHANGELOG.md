@@ -1,5 +1,23 @@
 # Changelog
 
+## Version 1.16.0 (2026-03-07)
+
+
+### New features
+
+* add grpc support to edge agent tunnel ([#1730](https://github.com/getarcaneapp/arcane/pull/1730) by @kmendell)
+* add auto-heal job to restart unhealthy containers ([#1780](https://github.com/getarcaneapp/arcane/pull/1780) by @garrett-edwards)
+* editor enhancements, switch back to code mirror editor ([#1861](https://github.com/getarcaneapp/arcane/pull/1861) by @kmendell)
+* updated dashboard layout with action items ([#1761](https://github.com/getarcaneapp/arcane/pull/1761) by @kmendell)
+* support direct https setup via environment variables ([#1877](https://github.com/getarcaneapp/arcane/pull/1877) by @kmendell)
+* selectable trivy container network ([#1896](https://github.com/getarcaneapp/arcane/pull/1896) by @kmendell)
+* image build support ([#1687](https://github.com/getarcaneapp/arcane/pull/1687) by @kmendell)
+* show template icons based on x-arcane labels ([#1933](https://github.com/getarcaneapp/arcane/pull/1933) by @kmendell)
+* oled dark theme ([#1937](https://
+
+---
+
+
 ## Version 1.15.3 (2026-02-24)
 
 
