@@ -44,43 +44,6 @@ The `log_level` option controls the level of log output by the addon:
 - `error`: Runtime errors
 - `fatal`: Critical errors
 
-### Option: `local_embed`
-
-Enable or disable the bundled local embedder (ONNX Runtime). Default: `true`. Disable if using an external embedding provider exclusively.
-
-### Option: `ollama_url`
-
-URL for an Ollama service to use for embeddings (e.g., `http://homeassistant.local:11434`). Leave empty to skip.
-
-### Option: `openai_key`
-
-OpenAI API key for embeddings. Leave empty to skip.
-
-### Option: `openai_url`
-
-Optional override for OpenAI-compatible endpoint (e.g., `http://localhost:8080/v1` for a local model). Only used when `openai_key` is set.
-
-### Option: `anthropic_key`
-
-Anthropic API key for LLM enrichment. When set alongside `enrich_url`, MuninnDB retroactively enriches existing memories in the background.
-
-### Option: `enrich_url`
-
-LLM enrichment endpoint URL (e.g., `anthropic://claude-haiku-4-5-20251001`). Requires `anthropic_key` to be set.
-
-### Option: `mem_limit_gb`
-
-Memory limit in gigabytes. Set to `0` for no limit (default). Useful for constraining resource usage.
-
-### Embedding Provider Keys
-
-Additional embedding providers can be configured via API keys:
-- `voyage_key` — Voyage AI
-- `cohere_key` — Cohere
-- `google_key` — Google (Gemini)
-- `jina_key` — Jina AI
-- `mistral_key` — Mistral AI
-
 ### SSL / TLS
 
 To enable HTTPS on all MuninnDB ports, set both:
@@ -88,6 +51,29 @@ To enable HTTPS on all MuninnDB ports, set both:
 - `ssl_keyfile` — Private key filename in `/ssl/` (e.g., `privkey.pem`)
 
 When configured, all ports (REST, Web UI, gRPC, MCP) serve over TLS. Access the Web UI at `https://[your-ip]:8476`.
+
+### Option: `mem_limit_gb`
+
+Memory limit in gigabytes. Set to `0` for no limit (default). Useful for constraining resource usage.
+
+### Option: `local_embed`
+
+Enable or disable the bundled local embedder (ONNX Runtime). Default: `true`. Disable if using an external embedding provider exclusively.
+
+### Embedding and Enrichment Providers
+
+API keys and URLs for embedding and LLM enrichment providers (all optional, alphabetical):
+
+- `anthropic_key` — Anthropic API key for LLM enrichment (used with `enrich_url`)
+- `cohere_key` — Cohere embeddings
+- `enrich_url` — LLM enrichment endpoint URL (e.g., `anthropic://claude-haiku-4-5-20251001`)
+- `google_key` — Google (Gemini) embeddings
+- `jina_key` — Jina AI embeddings
+- `mistral_key` — Mistral AI embeddings
+- `ollama_url` — Ollama service URL for embeddings (e.g., `http://homeassistant.local:11434`)
+- `openai_key` — OpenAI API key for embeddings
+- `openai_url` — Optional OpenAI-compatible endpoint override (e.g., `http://localhost:8080/v1`)
+- `voyage_key` — Voyage AI embeddings
 
 ## Folder Access
 

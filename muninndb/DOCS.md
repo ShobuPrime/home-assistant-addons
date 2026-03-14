@@ -16,42 +16,6 @@ The `log_level` option controls the level of log output by the addon:
 - `error`: Runtime errors
 - `fatal`: Critical errors
 
-### Option: `local_embed`
-
-Controls the bundled ONNX Runtime embedder. When enabled (default), MuninnDB can generate embeddings locally without external API calls. Disable if you exclusively use an external provider.
-
-### Option: `ollama_url`
-
-URL for an Ollama instance (e.g., `http://homeassistant.local:11434`). When configured, MuninnDB uses Ollama for embedding generation. This is useful if you already run Ollama on your network.
-
-### Option: `openai_key`
-
-OpenAI API key for cloud-based embeddings. Stored as a password field.
-
-### Option: `openai_url`
-
-Optional override for OpenAI-compatible endpoints (e.g., a local model at `http://localhost:8080/v1`). Only takes effect when `openai_key` is also set. An invalid URL disables OpenAI initialization.
-
-### Option: `anthropic_key`
-
-Anthropic API key (`sk-ant-...`) for LLM enrichment. When configured with `enrich_url`, MuninnDB uses Claude to retroactively enrich existing memories in the background — no migration or code change required.
-
-### Option: `enrich_url`
-
-LLM enrichment endpoint URL. For Anthropic, use the format `anthropic://claude-haiku-4-5-20251001`. Requires `anthropic_key` to be set. The enrich plugin upgrades every existing memory automatically in the background.
-
-### Option: `mem_limit_gb`
-
-Constrains MuninnDB's memory usage. Set to `0` (default) for unlimited. Useful on resource-constrained systems.
-
-### Embedding Provider Keys
-
-- `voyage_key` — Voyage AI embeddings
-- `cohere_key` — Cohere embeddings
-- `google_key` — Google (Gemini) embeddings
-- `jina_key` — Jina AI embeddings
-- `mistral_key` — Mistral AI embeddings
-
 ### SSL / TLS
 
 To enable HTTPS on all MuninnDB ports:
@@ -59,6 +23,29 @@ To enable HTTPS on all MuninnDB ports:
 - `ssl_keyfile` — Private key filename in `/ssl/` (e.g., `privkey.pem`)
 
 Both must be set for TLS to activate. When enabled, all ports (REST, Web UI, gRPC, MCP) serve over TLS. If the files are not found at the specified paths, the addon falls back to plain HTTP with a log error.
+
+### Option: `mem_limit_gb`
+
+Constrains MuninnDB's memory usage. Set to `0` (default) for unlimited. Useful on resource-constrained systems.
+
+### Option: `local_embed`
+
+Controls the bundled ONNX Runtime embedder. When enabled (default), MuninnDB can generate embeddings locally without external API calls. Disable if you exclusively use an external provider.
+
+### Embedding and Enrichment Providers
+
+All optional, listed alphabetically:
+
+- `anthropic_key` — Anthropic API key (`sk-ant-...`) for LLM enrichment. When configured with `enrich_url`, MuninnDB uses Claude to retroactively enrich existing memories in the background.
+- `cohere_key` — Cohere embeddings
+- `enrich_url` — LLM enrichment endpoint URL (e.g., `anthropic://claude-haiku-4-5-20251001`). Requires a provider key.
+- `google_key` — Google (Gemini) embeddings
+- `jina_key` — Jina AI embeddings
+- `mistral_key` — Mistral AI embeddings
+- `ollama_url` — Ollama instance URL for embeddings (e.g., `http://homeassistant.local:11434`)
+- `openai_key` — OpenAI API key for cloud-based embeddings
+- `openai_url` — Optional OpenAI-compatible endpoint override (e.g., `http://localhost:8080/v1`). Only takes effect when `openai_key` is also set.
+- `voyage_key` — Voyage AI embeddings
 
 ## Access Methods
 
