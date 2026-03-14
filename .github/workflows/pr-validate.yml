@@ -514,6 +514,18 @@ jobs:
 
               console.log('PR merged successfully');
 
+              // Delete the head branch
+              try {
+                await github.rest.git.deleteRef({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  ref: `heads/${pr.head.ref}`
+                });
+                console.log(`Deleted branch: ${pr.head.ref}`);
+              } catch (e) {
+                console.log(`Could not delete branch ${pr.head.ref}: ${e.message}`);
+              }
+
               await github.rest.issues.createComment({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
