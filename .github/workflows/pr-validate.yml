@@ -84,7 +84,7 @@ jobs:
             echo "Validating $addon_dir..."
 
             # Check required files
-            for required_file in config.yaml Dockerfile README.md DOCS.md CHANGELOG.md; do
+            for required_file in config.yaml Dockerfile README.md DOCS.md CHANGELOG.md icon.png; do
               if [ ! -f "$addon_dir/$required_file" ]; then
                 ERRORS="${ERRORS}\n- Missing $required_file in $addon_dir"
                 EXIT_CODE=1

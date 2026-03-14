@@ -91,11 +91,12 @@ Read `references/templates.md` for the exact content templates. Customize each t
 6. **`rootfs/etc/services.d/<name>/run`** - S6 service runner
 7. **`rootfs/etc/services.d/<name>/finish`** - S6 finish handler
 8. **`build.sh`** - Local build script
-9. **`CHANGELOG.md`** - Initial version entry
-10. **`README.md`** - User-facing overview and installation guide
-11. **`DOCS.md`** - Detailed configuration documentation
-12. **`CLAUDE.md`** - AI assistant guidance for future maintenance
-13. **`UPDATE_GUIDE.md`** - How to update the addon
+9. **`icon.png`** - PNG icon, minimum 256x256 (required by HA and CI validation). Source from upstream project logo/favicon.
+10. **`CHANGELOG.md`** - Initial version entry
+12. **`README.md`** - User-facing overview and installation guide
+13. **`DOCS.md`** - Detailed configuration documentation
+14. **`CLAUDE.md`** - AI assistant guidance for future maintenance
+15. **`UPDATE_GUIDE.md`** - How to update the addon
 
 ### Critical Conventions (Non-Negotiable)
 
@@ -394,6 +395,7 @@ Before considering the addon complete, verify:
 - [ ] Update script handles the upstream's version format correctly
 - [ ] Update workflow has a unique cron schedule (don't overlap with existing ones)
 - [ ] Base image update script includes the new addon
+- [ ] `icon.png` exists (PNG, minimum 256x256, sourced from upstream project branding)
 - [ ] CHANGELOG.md has an initial entry
 - [ ] README.md has correct architecture shields (only aarch64 and amd64)
 - [ ] CLAUDE.md accurately describes the addon's architecture and critical details
@@ -417,4 +419,9 @@ Pick an unoccupied slot (e.g., 4:00, 4:30, 5:00 AM UTC). Always verify with the 
 
 ## Icon File
 
-Each addon needs an `icon.png` in its root directory. Use a 256x256 PNG with the upstream project's logo or a representative icon. If the upstream project doesn't have a suitable icon, use a generic Docker/container icon or create a simple one. The icon appears in the Home Assistant addon store.
+Each addon **must** have an `icon.png` in its root directory (CI validation will fail without it). Requirements:
+- **Format**: PNG, minimum 256x256 pixels
+- **Source**: Download from the upstream project's website or GitHub repo (logo, favicon, og:image)
+- **Conversion** (if needed): `magick input.{jpg,svg,webp} -resize <size>x<size> -background none -flatten PNG32:icon.png`
+
+The icon appears in the Home Assistant addon store and sidebar.

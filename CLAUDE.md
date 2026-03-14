@@ -25,7 +25,7 @@ Each add-on should be created in its own directory with the following files:
 - `README.md` - Add-on overview and quick start
 - `DOCS.md` - Detailed documentation and configuration options
 - `CHANGELOG.md` - Version history
-- `icon.png` and `logo.png` - Visual assets
+- `icon.png` - Addon icon (PNG, minimum 256x256)
 
 ## Maintenance
 
