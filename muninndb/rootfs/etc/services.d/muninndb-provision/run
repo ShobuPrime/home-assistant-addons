@@ -20,7 +20,7 @@ bashio::log.info "Waiting for MuninnDB to start..."
 MAX_WAIT=60
 WAITED=0
 while [[ ${WAITED} -lt ${MAX_WAIT} ]]; do
-    if curl -sf http://127.0.0.1:8475/api/health > /dev/null 2>&1; then
+    if curl -sf http://127.0.0.1:8476/api/health > /dev/null 2>&1; then
         bashio::log.info "MuninnDB is ready"
         break
     fi
@@ -60,7 +60,7 @@ if bashio::config.has_value 'admin_password' && [[ -n "$(bashio::config 'admin_p
 
     if [[ "${NEW_PASSWORD}" != "${CURRENT_PASSWORD}" ]]; then
         PASS_RESPONSE=$(curl -s -w "%{http_code}" -b "${SESSION_COOKIE}" \
-            -X PUT http://127.0.0.1:8475/api/admin/password \
+            -X PUT http://127.0.0.1:8476/api/admin/password \
             -H 'Content-Type: application/json' \
             -d "{\"username\":\"root\",\"new_password\":\"${NEW_PASSWORD}\"}" 2>/dev/null)
 
@@ -89,13 +89,13 @@ if bashio::config.has_value 'default_vault' && [[ -n "$(bashio::config 'default_
 
     # Check if vault already exists
     VAULT_CHECK=$(curl -s -w "%{http_code}" -b "${SESSION_COOKIE}" \
-        "http://127.0.0.1:8475/api/admin/vaults/config" 2>/dev/null)
+        "http://127.0.0.1:8476/api/admin/vaults/config" 2>/dev/null)
 
     if echo "${VAULT_CHECK}" | grep -q "\"${VAULT_NAME}\""; then
         bashio::log.info "Vault '${VAULT_NAME}' already exists"
     else
         VAULT_RESPONSE=$(curl -s -w "%{http_code}" -b "${SESSION_COOKIE}" \
-            -X PUT http://127.0.0.1:8475/api/admin/vaults/config \
+            -X PUT http://127.0.0.1:8476/api/admin/vaults/config \
             -H 'Content-Type: application/json' \
             -d "{\"name\":\"${VAULT_NAME}\",\"public\":true}" 2>/dev/null)
 
