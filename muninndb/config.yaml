@@ -1,0 +1,58 @@
+name: "MuninnDB"
+description: "Cognitive database with memory primitives - Ebbinghaus decay, Hebbian learning, Bayesian confidence"
+version: "0.4.1-alpha"
+slug: "muninndb"
+init: false
+ingress: true
+ingress_port: 8476
+ingress_stream: true
+panel_icon: mdi:brain
+panel_title: MuninnDB
+arch:
+  - aarch64
+  - amd64
+startup: services
+boot: auto
+watchdog: tcp://[HOST]:[PORT:8475]
+ports:
+  8474/tcp: 8474
+  8475/tcp: 8475
+  8476/tcp: 8476
+  8477/tcp: 8477
+  8750/tcp: 8750
+ports_description:
+  8474/tcp: "MBP binary protocol"
+  8475/tcp: "REST API"
+  8476/tcp: "Web UI"
+  8477/tcp: "gRPC API"
+  8750/tcp: "MCP (Model Context Protocol)"
+host_network: false
+apparmor: true
+hassio_api: true
+map:
+  - ssl:ro
+  - data:rw
+  - media:rw
+  - share:rw
+options:
+  log_level: info
+  local_embed: true
+  ollama_url: ""
+  openai_key: ""
+  mem_limit_gb: 0
+  voyage_key: ""
+  cohere_key: ""
+  gemini_key: ""
+  jina_key: ""
+  mistral_key: ""
+schema:
+  log_level: list(trace|debug|info|warning|error|fatal)?
+  local_embed: bool?
+  ollama_url: str?
+  openai_key: password?
+  mem_limit_gb: int?
+  voyage_key: password?
+  cohere_key: password?
+  gemini_key: password?
+  jina_key: password?
+  mistral_key: password?

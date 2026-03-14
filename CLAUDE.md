@@ -107,7 +107,7 @@ See [`.github/AUTOMATION.md`](.github/AUTOMATION.md) for complete documentation.
 ## Dockerfile Best Practices
 
 - **Always run `apk upgrade --no-cache` before `apk add`** in Dockerfiles to resolve base image package version mismatches (e.g. libcrypto3/libssl3 conflicts with openssl)
-- **Provide a default for `ARG BUILD_FROM`** (e.g. `ARG BUILD_FROM=ghcr.io/hassio-addons/base:20.0.1`) to silence Docker's `InvalidDefaultArgInFrom` warning
+- **Use `ARG BUILD_FROM` with no default** — the base image version is defined in `build.yaml` and passed at build time by the HA builder and `build.sh`. Do not add inline defaults as they drift out of sync.
 - **Architecture support**: All addons support only `aarch64` and `amd64` (hassio-addons base v19+ dropped armhf/armv7/i386)
 
 ## Notes

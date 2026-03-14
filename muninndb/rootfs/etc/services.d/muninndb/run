@@ -1,0 +1,92 @@
+#!/usr/bin/with-contenv bashio
+# ==============================================================================
+# Home Assistant Add-on: MuninnDB
+# Runs MuninnDB
+# ==============================================================================
+
+bashio::log.info 'Starting MuninnDB...'
+
+# Set data directory
+export MUNINNDB_DATA="/data/muninndb"
+
+# Configure local embedder
+if bashio::config.true 'local_embed'; then
+    export MUNINN_LOCAL_EMBED="1"
+    bashio::log.info "Local embedder enabled"
+else
+    export MUNINN_LOCAL_EMBED="0"
+    bashio::log.info "Local embedder disabled"
+fi
+
+# Configure Ollama integration
+if bashio::config.has_value 'ollama_url' && [[ -n "$(bashio::config 'ollama_url')" ]]; then
+    export MUNINN_OLLAMA_URL=$(bashio::config 'ollama_url')
+    bashio::log.info "Ollama URL: ${MUNINN_OLLAMA_URL}"
+fi
+
+# Configure OpenAI embeddings
+if bashio::config.has_value 'openai_key' && [[ -n "$(bashio::config 'openai_key')" ]]; then
+    export MUNINN_OPENAI_KEY=$(bashio::config 'openai_key')
+    bashio::log.info "OpenAI embeddings configured"
+fi
+
+# Configure memory limit
+if bashio::config.has_value 'mem_limit_gb'; then
+    MEM_LIMIT=$(bashio::config 'mem_limit_gb')
+    if [[ "${MEM_LIMIT}" -gt 0 ]]; then
+        export MUNINN_MEM_LIMIT_GB="${MEM_LIMIT}"
+        bashio::log.info "Memory limit: ${MEM_LIMIT}GB"
+    fi
+fi
+
+# Configure additional embedding provider API keys
+if bashio::config.has_value 'voyage_key' && [[ -n "$(bashio::config 'voyage_key')" ]]; then
+    export MUNINN_VOYAGE_KEY=$(bashio::config 'voyage_key')
+    bashio::log.info "Voyage embeddings configured"
+fi
+
+if bashio::config.has_value 'cohere_key' && [[ -n "$(bashio::config 'cohere_key')" ]]; then
+    export MUNINN_COHERE_KEY=$(bashio::config 'cohere_key')
+    bashio::log.info "Cohere embeddings configured"
+fi
+
+if bashio::config.has_value 'gemini_key' && [[ -n "$(bashio::config 'gemini_key')" ]]; then
+    export MUNINN_GEMINI_KEY=$(bashio::config 'gemini_key')
+    bashio::log.info "Gemini embeddings configured"
+fi
+
+if bashio::config.has_value 'jina_key' && [[ -n "$(bashio::config 'jina_key')" ]]; then
+    export MUNINN_JINA_KEY=$(bashio::config 'jina_key')
+    bashio::log.info "Jina embeddings configured"
+fi
+
+if bashio::config.has_value 'mistral_key' && [[ -n "$(bashio::config 'mistral_key')" ]]; then
+    export MUNINN_MISTRAL_KEY=$(bashio::config 'mistral_key')
+    bashio::log.info "Mistral embeddings configured"
+fi
+
+# Log level configuration
+if bashio::config.has_value 'log_level'; then
+    case "$(bashio::config 'log_level')" in
+        trace|debug)
+            export LOG_LEVEL="debug"
+            ;;
+        warning|error|fatal)
+            export LOG_LEVEL="error"
+            ;;
+        *)
+            export LOG_LEVEL="info"
+            ;;
+    esac
+fi
+
+# Log configuration
+bashio::log.info "Starting MuninnDB with configuration:"
+bashio::log.info "  Data directory: ${MUNINNDB_DATA}"
+bashio::log.info "  Ports: 8474 (MBP), 8475 (REST), 8476 (Web UI), 8477 (gRPC), 8750 (MCP)"
+
+# Change to the muninndb directory
+cd /opt/muninndb
+
+# Run MuninnDB
+exec /opt/muninndb/muninn serve
