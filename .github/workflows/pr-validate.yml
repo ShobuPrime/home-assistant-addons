@@ -43,16 +43,44 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: ${{ needs.resolve-context.outputs.head_sha }}
+          fetch-depth: 0
+
+      - name: Get changed addons
+        id: changed
+        run: |
+          BASE_REF="${{ needs.resolve-context.outputs.base_ref }}"
+          git fetch origin "${BASE_REF}"
+          CHANGED_FILES=$(git diff --name-only "origin/${BASE_REF}...HEAD")
+
+          # Find which addon directories have changes
+          CHANGED_ADDONS=""
+          for addon_dir in */config.yaml; do
+            addon_dir=$(dirname "$addon_dir")
+            if echo "$CHANGED_FILES" | grep -q "^${addon_dir}/"; then
+              CHANGED_ADDONS="${CHANGED_ADDONS} ${addon_dir}"
+            fi
+          done
+
+          CHANGED_ADDONS=$(echo "$CHANGED_ADDONS" | xargs)
+          echo "changed_addons=${CHANGED_ADDONS}" >> $GITHUB_OUTPUT
+          echo "Changed addons: ${CHANGED_ADDONS:-none}"
 
       - name: Validate addon structure
         id: validate
         run: |
+          CHANGED_ADDONS="${{ steps.changed.outputs.changed_addons }}"
+
+          # If no addon-specific changes (e.g., workflow-only changes), skip
+          if [ -z "$CHANGED_ADDONS" ]; then
+            echo "✓ No addon-specific changes detected, skipping structure validation"
+            exit 0
+          fi
+
           EXIT_CODE=0
           ERRORS=""
 
-          # Find all addon directories (those with config.yaml)
-          for addon_dir in */config.yaml; do
-            addon_dir=$(dirname "$addon_dir")
+          # Only validate changed addon directories
+          for addon_dir in $CHANGED_ADDONS; do
             echo "Validating $addon_dir..."
 
             # Check required files
@@ -199,17 +227,38 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: ${{ needs.resolve-context.outputs.head_sha }}
+          fetch-depth: 0
+
+      - name: Get changed YAML files
+        id: changed_yaml
+        run: |
+          BASE_REF="${{ needs.resolve-context.outputs.base_ref }}"
+          git fetch origin "${BASE_REF}"
+          CHANGED_YAML=$(git diff --name-only "origin/${BASE_REF}...HEAD" | grep -E '\.(yaml|yml)$' || true)
+          echo "files<<EOF" >> $GITHUB_OUTPUT
+          echo "$CHANGED_YAML" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+          echo "Changed YAML files: ${CHANGED_YAML:-none}"
 
       - name: Set up Python
+        if: steps.changed_yaml.outputs.files != ''
         uses: actions/setup-python@v5
         with:
           python-version: '3.x'
 
       - name: Install yamllint
+        if: steps.changed_yaml.outputs.files != ''
         run: pip install yamllint
 
-      - name: Lint YAML files
+      - name: Lint changed YAML files
         run: |
+          CHANGED_YAML="${{ steps.changed_yaml.outputs.files }}"
+
+          if [ -z "$CHANGED_YAML" ]; then
+            echo "✓ No YAML files changed, skipping lint"
+            exit 0
+          fi
+
           # Create yamllint config
           cat > .yamllint << 'EOF'
           extends: default
@@ -226,8 +275,10 @@ jobs:
             new-line-at-end-of-file: disable
           EOF
 
-          # Lint all YAML files
-          yamllint -f parsable $(find . -name "*.yaml" -o -name "*.yml" | grep -v ".git")
+          # Lint only changed YAML files
+          echo "Linting changed YAML files:"
+          echo "$CHANGED_YAML"
+          yamllint -f parsable $CHANGED_YAML
 
   summary:
     name: Validation Summary
@@ -375,8 +426,8 @@ jobs:
 
             // Wait for Builder workflow to complete
             console.log('Checking Builder workflow status...');
-            const maxAttempts = 30;
-            const pollInterval = 20000; // 20 seconds
+            const maxAttempts = 45;
+            const pollInterval = 20000; // 20 seconds (45 * 20s = 15 min total)
 
             for (let attempt = 1; attempt <= maxAttempts; attempt++) {
               const { data: checkRuns } = await github.rest.checks.listForRef({

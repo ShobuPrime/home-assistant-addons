@@ -1,9 +1,9 @@
-name: Update Base Image
+name: Update MuninnDB
 
 on:
   schedule:
-    # Run daily at 1 AM UTC (offset from other update workflows at 2-3 AM)
-    - cron: '0 1 * * *'
+    # Run daily at 4 AM UTC (unique slot, avoids conflicts with existing workflows)
+    - cron: '0 4 * * *'
   workflow_dispatch:
     # Allow manual triggering
 
@@ -18,7 +18,6 @@ jobs:
       update_available: ${{ steps.check.outputs.update_available }}
       current_version: ${{ steps.check.outputs.current_version }}
       latest_version: ${{ steps.check.outputs.latest_version }}
-      major_bump: ${{ steps.check.outputs.major_bump }}
       changelog: ${{ steps.check.outputs.changelog }}
     steps:
       - name: Checkout repository
@@ -27,19 +26,18 @@ jobs:
       - name: Check for updates
         id: check
         run: |
-          result=$(REPO_ROOT=. CHECK_ONLY=true JSON_OUTPUT=true bash .github/scripts/update-base-image.sh)
+          cd muninndb
+          result=$(ADDON_PATH=. CHECK_ONLY=true JSON_OUTPUT=true bash ../.github/scripts/update-muninndb.sh)
           echo "Result: $result"
 
           update_available=$(echo "$result" | jq -r '.update_available')
           current=$(echo "$result" | jq -r '.current')
           latest=$(echo "$result" | jq -r '.latest')
-          major_bump=$(echo "$result" | jq -r '.major_bump')
           changelog=$(echo "$result" | jq -r '.changelog')
 
           echo "update_available=$update_available" >> $GITHUB_OUTPUT
           echo "current_version=$current" >> $GITHUB_OUTPUT
           echo "latest_version=$latest" >> $GITHUB_OUTPUT
-          echo "major_bump=$major_bump" >> $GITHUB_OUTPUT
           echo "changelog<<EOF" >> $GITHUB_OUTPUT
           echo "$changelog" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
@@ -57,23 +55,11 @@ jobs:
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
 
-      - name: Update base image
+      - name: Update MuninnDB
+        id: update
         run: |
-          REPO_ROOT=. CHECK_ONLY=false JSON_OUTPUT=false bash .github/scripts/update-base-image.sh
-
-      - name: Determine labels
-        id: labels
-        run: |
-          labels="automated
-          base-image
-          update"
-          if [ "${{ needs.check-update.outputs.major_bump }}" = "true" ]; then
-            labels="$labels
-          needs-review"
-          fi
-          echo "labels<<EOF" >> $GITHUB_OUTPUT
-          echo "$labels" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+          cd muninndb
+          ADDON_PATH=. CHECK_ONLY=false JSON_OUTPUT=false bash ../.github/scripts/update-muninndb.sh
 
       - name: Create Pull Request
         id: create-pr
@@ -82,46 +68,40 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           sign-commits: true
           commit-message: |
-            Update hassio-addons base image to ${{ needs.check-update.outputs.latest_version }}
+            Update MuninnDB to ${{ needs.check-update.outputs.latest_version }}
 
             Automated update from ${{ needs.check-update.outputs.current_version }} to ${{ needs.check-update.outputs.latest_version }}
-          branch: update-base-image-${{ needs.check-update.outputs.latest_version }}
+          branch: update-muninndb-${{ needs.check-update.outputs.latest_version }}
           delete-branch: true
-          title: "Update hassio-addons base image to ${{ needs.check-update.outputs.latest_version }}"
+          title: "Update MuninnDB to ${{ needs.check-update.outputs.latest_version }}"
           body: |
-            ## Base Image Update
+            ## MuninnDB Update
 
-            This automated PR updates the hassio-addons base image (`ghcr.io/hassio-addons/base`) from `${{ needs.check-update.outputs.current_version }}` to `${{ needs.check-update.outputs.latest_version }}`.
+            This automated PR updates MuninnDB from `${{ needs.check-update.outputs.current_version }}` to `${{ needs.check-update.outputs.latest_version }}`.
 
-            ${{ needs.check-update.outputs.major_bump == 'true' && '> **Major version bump detected.** Please review for breaking changes before merging.' || '' }}
-
-            ### Release Notes
+            ### Changelog
 
             ${{ needs.check-update.outputs.changelog }}
 
-            ### Affected Addons
-
-            All addons using the hassio-addons base image:
-            - `arcane`
-            - `dockge`
-            - `dockhand`
-            - `huly`
-            - `portainer_ee_lts`
-            - `portainer_ee_sts`
-
             ### Changes
 
-            - Updated `build.yaml` base image version in all addons
-            - Updated any Dockerfiles with inline `BUILD_FROM` defaults
+            - Updated `config.yaml` version
+            - Updated `build.yaml` MUNINNDB_VERSION
+            - Updated `Dockerfile` MUNINNDB_VERSION
+            - Updated documentation files
+            - Updated CHANGELOG.md
 
-            ### Release Info
+            ### Release Notes
 
-            Full release notes: https://github.com/hassio-addons/app-base/releases/tag/v${{ needs.check-update.outputs.latest_version }}
+            Full release notes: https://github.com/scrypster/muninndb/releases/tag/v${{ needs.check-update.outputs.latest_version }}
 
             ---
 
-            This PR was automatically generated by the Update Base Image workflow
-          labels: ${{ steps.labels.outputs.labels }}
+            This PR was automatically generated by the Update MuninnDB workflow
+          labels: |
+            automated
+            muninndb
+            update
           draft: false
 
       - name: Trigger downstream workflows
@@ -136,7 +116,7 @@ jobs:
               "client_payload": {
                 "pull_request_number": "${{ steps.create-pr.outputs.pull-request-number }}",
                 "head_sha": "${{ steps.create-pr.outputs.pull-request-head-sha }}",
-                "branch": "update-base-image-${{ needs.check-update.outputs.latest_version }}",
-                "addon": "all"
+                "branch": "update-muninndb-${{ needs.check-update.outputs.latest_version }}",
+                "addon": "muninndb"
               }
             }'
