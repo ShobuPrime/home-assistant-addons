@@ -52,6 +52,14 @@ Constrains MuninnDB's memory usage. Set to `0` (default) for unlimited. Useful o
 - `jina_key` — Jina AI embeddings
 - `mistral_key` — Mistral AI embeddings
 
+### SSL / TLS
+
+To enable HTTPS on all MuninnDB ports:
+- `ssl_certfile` — Certificate filename in `/ssl/` (e.g., `fullchain.pem`)
+- `ssl_keyfile` — Private key filename in `/ssl/` (e.g., `privkey.pem`)
+
+Both must be set for TLS to activate. When enabled, all ports (REST, Web UI, gRPC, MCP) serve over TLS. If the files are not found at the specified paths, the addon falls back to plain HTTP with a log error.
+
 ## Access Methods
 
 1. **Via Sidebar**: Click the brain icon in Home Assistant (uses ingress)

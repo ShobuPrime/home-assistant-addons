@@ -36,29 +36,33 @@ map:
   - share:rw
 options:
   log_level: info
-  local_embed: true
-  ollama_url: ""
-  openai_key: ""
-  openai_url: ""
-  anthropic_key: ""
-  enrich_url: ""
+  ssl_certfile: ""
+  ssl_keyfile: ""
   mem_limit_gb: 0
-  voyage_key: ""
+  local_embed: true
+  anthropic_key: ""
   cohere_key: ""
+  enrich_url: ""
   google_key: ""
   jina_key: ""
   mistral_key: ""
+  ollama_url: ""
+  openai_key: ""
+  openai_url: ""
+  voyage_key: ""
 schema:
   log_level: list(trace|debug|info|warning|error|fatal)?
-  local_embed: bool?
-  ollama_url: str?
-  openai_key: password?
-  openai_url: str?
-  anthropic_key: password?
-  enrich_url: str?
+  ssl_certfile: str?
+  ssl_keyfile: str?
   mem_limit_gb: int?
-  voyage_key: password?
+  local_embed: bool?
+  anthropic_key: password?
   cohere_key: password?
+  enrich_url: str?
   google_key: password?
   jina_key: password?
   mistral_key: password?
+  ollama_url: str?
+  openai_key: password?
+  openai_url: str?
+  voyage_key: password?

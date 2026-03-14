@@ -81,6 +81,14 @@ Additional embedding providers can be configured via API keys:
 - `jina_key` — Jina AI
 - `mistral_key` — Mistral AI
 
+### SSL / TLS
+
+To enable HTTPS on all MuninnDB ports, set both:
+- `ssl_certfile` — Certificate filename in `/ssl/` (e.g., `fullchain.pem`)
+- `ssl_keyfile` — Private key filename in `/ssl/` (e.g., `privkey.pem`)
+
+When configured, all ports (REST, Web UI, gRPC, MCP) serve over TLS. Access the Web UI at `https://[your-ip]:8476`.
+
 ## Folder Access
 
 This addon has access to the following Home Assistant directories:
