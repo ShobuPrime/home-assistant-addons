@@ -6,6 +6,7 @@
 # ==============================================================================
 
 PROVISION_MARKER="/data/muninndb/.provisioned"
+STORED_HASH_FILE="/data/muninndb/.admin_pass_hash"
 STORED_PASS_FILE="/data/muninndb/.admin_pass_set"
 
 # If already provisioned and no password change requested, exit immediately
@@ -63,14 +64,19 @@ bashio::log.info "Logged in to MuninnDB as root"
 # Change admin password if configured
 if bashio::config.has_value 'admin_password' && [[ -n "$(bashio::config 'admin_password')" ]]; then
     NEW_PASSWORD=$(bashio::config 'admin_password')
-
-    # Use checksums for reliable comparison (avoids shell escaping issues)
     NEW_HASH=$(printf '%s' "${NEW_PASSWORD}" | sha256sum | cut -d' ' -f1)
-    CURRENT_HASH=$(printf '%s' "${CURRENT_PASSWORD}" | sha256sum | cut -d' ' -f1)
+
+    # Compare against stored hash (not the password text)
+    STORED_HASH=""
+    if [[ -f "${STORED_HASH_FILE}" ]]; then
+        STORED_HASH=$(cat "${STORED_HASH_FILE}")
+    fi
 
     if [[ ${#NEW_PASSWORD} -lt 8 ]]; then
         bashio::log.error "admin_password must be at least 8 characters (got ${#NEW_PASSWORD})"
-    elif [[ "${NEW_HASH}" != "${CURRENT_HASH}" ]]; then
+    elif [[ "${NEW_HASH}" == "${STORED_HASH}" ]]; then
+        bashio::log.info "Admin password unchanged"
+    else
         bashio::log.info "Password change detected, updating..."
 
         PASS_PAYLOAD=$(jq -n --arg user "root" --arg pass "${NEW_PASSWORD}" \
@@ -86,6 +92,9 @@ if bashio::config.has_value 'admin_password' && [[ -n "$(bashio::config 'admin_p
 
         if [[ "${PASS_CODE}" == "200" ]] || [[ "${PASS_CODE}" == "204" ]]; then
             bashio::log.info "Admin password updated successfully"
+            # Store both the hash (for comparison) and the password (for login)
+            printf '%s' "${NEW_HASH}" > "${STORED_HASH_FILE}"
+            chmod 600 "${STORED_HASH_FILE}"
             printf '%s' "${NEW_PASSWORD}" > "${STORED_PASS_FILE}"
             chmod 600 "${STORED_PASS_FILE}"
 
@@ -99,8 +108,6 @@ if bashio::config.has_value 'admin_password' && [[ -n "$(bashio::config 'admin_p
         else
             bashio::log.warning "Failed to update admin password (HTTP ${PASS_CODE}): ${PASS_BODY}"
         fi
-    else
-        bashio::log.info "Admin password unchanged"
     fi
 fi
 
@@ -108,13 +115,12 @@ fi
 if bashio::config.has_value 'default_vault' && [[ -n "$(bashio::config 'default_vault')" ]]; then
     VAULT_NAME=$(bashio::config 'default_vault')
 
-    # Check if vault already exists by querying the vaults list
+    # GET /api/vaults returns a JSON array of vault name strings: ["default","homeassistant"]
     VAULT_LIST=$(curl -s -b "${SESSION_COOKIE}" \
         "http://127.0.0.1:8476/api/vaults" 2>/dev/null)
 
     if echo "${VAULT_LIST}" | jq -e --arg name "${VAULT_NAME}" \
-        'if type == "array" then map(select(.name == $name)) | length > 0
-         else .[$name] != null end' > /dev/null 2>&1; then
+        'index($name) != null' > /dev/null 2>&1; then
         bashio::log.info "Vault '${VAULT_NAME}' already exists"
     else
         VAULT_PAYLOAD=$(jq -n --arg name "${VAULT_NAME}" \
