@@ -64,7 +64,9 @@ bashio::log.info "Logged in to MuninnDB as root"
 if bashio::config.has_value 'admin_password' && [[ -n "$(bashio::config 'admin_password')" ]]; then
     NEW_PASSWORD=$(bashio::config 'admin_password')
 
-    if [[ "${NEW_PASSWORD}" != "${CURRENT_PASSWORD}" ]]; then
+    if [[ ${#NEW_PASSWORD} -lt 8 ]]; then
+        bashio::log.error "admin_password must be at least 8 characters (got ${#NEW_PASSWORD})"
+    elif [[ "${NEW_PASSWORD}" != "${CURRENT_PASSWORD}" ]]; then
         # Build JSON payload safely using jq to handle special characters
         PASS_PAYLOAD=$(jq -n --arg user "root" --arg pass "${NEW_PASSWORD}" \
             '{username: $user, new_password: $pass}')
@@ -83,10 +85,12 @@ if bashio::config.has_value 'admin_password' && [[ -n "$(bashio::config 'admin_p
             chmod 600 "${STORED_PASS_FILE}"
 
             # Re-login with new password for vault creation
+            RELOGIN_PAYLOAD=$(jq -n --arg user "root" --arg pass "${NEW_PASSWORD}" \
+                '{username: $user, password: $pass}')
             curl -s -c "${SESSION_COOKIE}" \
                 -X POST http://127.0.0.1:8476/api/auth/login \
                 -H 'Content-Type: application/json' \
-                -d "{\"username\":\"root\",\"password\":\"${NEW_PASSWORD}\"}" > /dev/null 2>&1
+                -d "${RELOGIN_PAYLOAD}" > /dev/null 2>&1
         else
             bashio::log.warning "Failed to update admin password (HTTP ${PASS_CODE}): ${PASS_BODY}"
         fi
