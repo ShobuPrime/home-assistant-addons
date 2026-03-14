@@ -42,29 +42,41 @@ fi
 
 # Login to get session cookie
 SESSION_COOKIE=$(mktemp)
-LOGIN_RESPONSE=$(curl -s -w "%{http_code}" -c "${SESSION_COOKIE}" \
+LOGIN_PAYLOAD=$(jq -n --arg user "root" --arg pass "${CURRENT_PASSWORD}" \
+    '{username: $user, password: $pass}')
+
+LOGIN_RESPONSE=$(curl -s -w "\n%{http_code}" -c "${SESSION_COOKIE}" \
     -X POST http://127.0.0.1:8476/api/auth/login \
     -H 'Content-Type: application/json' \
-    -d "{\"username\":\"root\",\"password\":\"${CURRENT_PASSWORD}\"}" 2>/dev/null)
+    -d "${LOGIN_PAYLOAD}" 2>/dev/null)
 
-HTTP_CODE="${LOGIN_RESPONSE: -3}"
+HTTP_CODE=$(echo "${LOGIN_RESPONSE}" | tail -1)
 if [[ "${HTTP_CODE}" != "200" ]]; then
-    bashio::log.warning "Could not login to MuninnDB (HTTP ${HTTP_CODE}), skipping provisioning"
+    LOGIN_BODY=$(echo "${LOGIN_RESPONSE}" | sed '$d')
+    bashio::log.warning "Could not login to MuninnDB (HTTP ${HTTP_CODE}): ${LOGIN_BODY}"
     rm -f "${SESSION_COOKIE}"
     exec s6-svc -O /run/service/muninndb-provision
 fi
+
+bashio::log.info "Logged in to MuninnDB as root"
 
 # Change admin password if configured
 if bashio::config.has_value 'admin_password' && [[ -n "$(bashio::config 'admin_password')" ]]; then
     NEW_PASSWORD=$(bashio::config 'admin_password')
 
     if [[ "${NEW_PASSWORD}" != "${CURRENT_PASSWORD}" ]]; then
-        PASS_RESPONSE=$(curl -s -w "%{http_code}" -b "${SESSION_COOKIE}" \
+        # Build JSON payload safely using jq to handle special characters
+        PASS_PAYLOAD=$(jq -n --arg user "root" --arg pass "${NEW_PASSWORD}" \
+            '{username: $user, new_password: $pass}')
+
+        PASS_RESPONSE=$(curl -s -w "\n%{http_code}" -b "${SESSION_COOKIE}" \
             -X PUT http://127.0.0.1:8476/api/admin/password \
             -H 'Content-Type: application/json' \
-            -d "{\"username\":\"root\",\"new_password\":\"${NEW_PASSWORD}\"}" 2>/dev/null)
+            -d "${PASS_PAYLOAD}" 2>/dev/null)
 
-        PASS_CODE="${PASS_RESPONSE: -3}"
+        PASS_CODE=$(echo "${PASS_RESPONSE}" | tail -1)
+        PASS_BODY=$(echo "${PASS_RESPONSE}" | sed '$d')
+
         if [[ "${PASS_CODE}" == "200" ]] || [[ "${PASS_CODE}" == "204" ]]; then
             bashio::log.info "Admin password updated successfully"
             echo -n "${NEW_PASSWORD}" > "${STORED_PASS_FILE}"
@@ -76,7 +88,7 @@ if bashio::config.has_value 'admin_password' && [[ -n "$(bashio::config 'admin_p
                 -H 'Content-Type: application/json' \
                 -d "{\"username\":\"root\",\"password\":\"${NEW_PASSWORD}\"}" > /dev/null 2>&1
         else
-            bashio::log.warning "Failed to update admin password (HTTP ${PASS_CODE})"
+            bashio::log.warning "Failed to update admin password (HTTP ${PASS_CODE}): ${PASS_BODY}"
         fi
     else
         bashio::log.info "Admin password already matches configured value"
