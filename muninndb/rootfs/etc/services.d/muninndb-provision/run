@@ -1,0 +1,120 @@
+#!/usr/bin/with-contenv bashio
+# ==============================================================================
+# Home Assistant Add-on: MuninnDB
+# Post-startup provisioning: sets admin password and creates default vault.
+# Runs as an S6 service that exits after provisioning is complete.
+# ==============================================================================
+
+PROVISION_MARKER="/data/muninndb/.provisioned"
+
+# If already provisioned and no password change requested, exit immediately
+if [[ -f "${PROVISION_MARKER}" ]]; then
+    if ! bashio::config.has_value 'admin_password' || [[ -z "$(bashio::config 'admin_password')" ]]; then
+        bashio::log.info "MuninnDB already provisioned, skipping"
+        exec s6-svc -O /run/service/muninndb-provision
+    fi
+fi
+
+# Wait for MuninnDB to be healthy
+bashio::log.info "Waiting for MuninnDB to start..."
+MAX_WAIT=60
+WAITED=0
+while [[ ${WAITED} -lt ${MAX_WAIT} ]]; do
+    if curl -sf http://127.0.0.1:8475/api/health > /dev/null 2>&1; then
+        bashio::log.info "MuninnDB is ready"
+        break
+    fi
+    sleep 1
+    WAITED=$((WAITED + 1))
+done
+
+if [[ ${WAITED} -ge ${MAX_WAIT} ]]; then
+    bashio::log.error "MuninnDB did not become healthy within ${MAX_WAIT}s, skipping provisioning"
+    exec s6-svc -O /run/service/muninndb-provision
+fi
+
+# Determine current password (use default on first run, or stored password)
+CURRENT_PASSWORD="password"
+STORED_PASS_FILE="/data/muninndb/.admin_pass_set"
+if [[ -f "${STORED_PASS_FILE}" ]]; then
+    CURRENT_PASSWORD=$(cat "${STORED_PASS_FILE}")
+fi
+
+# Login to get session cookie
+SESSION_COOKIE=$(mktemp)
+LOGIN_RESPONSE=$(curl -s -w "%{http_code}" -c "${SESSION_COOKIE}" \
+    -X POST http://127.0.0.1:8476/api/auth/login \
+    -H 'Content-Type: application/json' \
+    -d "{\"username\":\"root\",\"password\":\"${CURRENT_PASSWORD}\"}" 2>/dev/null)
+
+HTTP_CODE="${LOGIN_RESPONSE: -3}"
+if [[ "${HTTP_CODE}" != "200" ]]; then
+    bashio::log.warning "Could not login to MuninnDB (HTTP ${HTTP_CODE}), skipping provisioning"
+    rm -f "${SESSION_COOKIE}"
+    exec s6-svc -O /run/service/muninndb-provision
+fi
+
+# Change admin password if configured
+if bashio::config.has_value 'admin_password' && [[ -n "$(bashio::config 'admin_password')" ]]; then
+    NEW_PASSWORD=$(bashio::config 'admin_password')
+
+    if [[ "${NEW_PASSWORD}" != "${CURRENT_PASSWORD}" ]]; then
+        PASS_RESPONSE=$(curl -s -w "%{http_code}" -b "${SESSION_COOKIE}" \
+            -X PUT http://127.0.0.1:8475/api/admin/password \
+            -H 'Content-Type: application/json' \
+            -d "{\"username\":\"root\",\"new_password\":\"${NEW_PASSWORD}\"}" 2>/dev/null)
+
+        PASS_CODE="${PASS_RESPONSE: -3}"
+        if [[ "${PASS_CODE}" == "200" ]] || [[ "${PASS_CODE}" == "204" ]]; then
+            bashio::log.info "Admin password updated successfully"
+            echo -n "${NEW_PASSWORD}" > "${STORED_PASS_FILE}"
+            chmod 600 "${STORED_PASS_FILE}"
+
+            # Re-login with new password for vault creation
+            curl -s -c "${SESSION_COOKIE}" \
+                -X POST http://127.0.0.1:8476/api/auth/login \
+                -H 'Content-Type: application/json' \
+                -d "{\"username\":\"root\",\"password\":\"${NEW_PASSWORD}\"}" > /dev/null 2>&1
+        else
+            bashio::log.warning "Failed to update admin password (HTTP ${PASS_CODE})"
+        fi
+    else
+        bashio::log.info "Admin password already matches configured value"
+    fi
+fi
+
+# Create default vault if configured
+if bashio::config.has_value 'default_vault' && [[ -n "$(bashio::config 'default_vault')" ]]; then
+    VAULT_NAME=$(bashio::config 'default_vault')
+
+    # Check if vault already exists
+    VAULT_CHECK=$(curl -s -w "%{http_code}" -b "${SESSION_COOKIE}" \
+        "http://127.0.0.1:8475/api/admin/vaults/config" 2>/dev/null)
+
+    if echo "${VAULT_CHECK}" | grep -q "\"${VAULT_NAME}\""; then
+        bashio::log.info "Vault '${VAULT_NAME}' already exists"
+    else
+        VAULT_RESPONSE=$(curl -s -w "%{http_code}" -b "${SESSION_COOKIE}" \
+            -X PUT http://127.0.0.1:8475/api/admin/vaults/config \
+            -H 'Content-Type: application/json' \
+            -d "{\"name\":\"${VAULT_NAME}\",\"public\":true}" 2>/dev/null)
+
+        VAULT_CODE="${VAULT_RESPONSE: -3}"
+        if [[ "${VAULT_CODE}" == "200" ]] || [[ "${VAULT_CODE}" == "201" ]] || [[ "${VAULT_CODE}" == "204" ]]; then
+            bashio::log.info "Created vault '${VAULT_NAME}' (public)"
+        else
+            bashio::log.warning "Failed to create vault '${VAULT_NAME}' (HTTP ${VAULT_CODE})"
+        fi
+    fi
+fi
+
+# Mark as provisioned
+touch "${PROVISION_MARKER}"
+
+# Clean up
+rm -f "${SESSION_COOKIE}"
+
+bashio::log.info "MuninnDB provisioning complete"
+
+# Exit this oneshot service
+exec s6-svc -O /run/service/muninndb-provision

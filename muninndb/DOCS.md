@@ -20,6 +20,24 @@ The `log_level` option controls the level of log output by the addon:
 
 ---
 
+### Option: `admin_password`
+
+Sets the admin password for the MuninnDB web UI. On first startup, MuninnDB creates a default `root` / `password` account. When this option is set, the addon automatically changes the admin password via the REST API after MuninnDB starts. The password must be at least 8 characters.
+
+Leave empty to keep the default credentials. **Strongly recommended to set this** before exposing MuninnDB to the network.
+
+The password change is tracked in `/data/muninndb/.admin_pass_set` — if you change the option value, the addon will update the password on the next restart.
+
+---
+
+### Option: `default_vault`
+
+Name of a vault to automatically create on first startup. Default: `homeassistant`. The vault is created as public (no API key required), making it immediately available to AI tools via MCP without additional authentication.
+
+Set to empty to skip vault creation. Additional vaults can be created via the Web UI or REST API.
+
+---
+
 ### SSL / TLS
 
 To enable HTTPS on all MuninnDB ports:
@@ -116,12 +134,12 @@ The primary query mechanism. Accepts a context string and returns the N most cog
 
 ## First Time Setup
 
-1. Start the add-on and open the Web UI
-2. Log in with default credentials: `root` / `password`
-3. **Change the default password immediately** via the dashboard
-4. Create a vault for your use case
-5. Connect AI tools via the MCP endpoint at port 8750
-6. Optionally configure an embedding provider for semantic search
+1. Set `admin_password` in the addon configuration (at least 8 characters)
+2. Optionally change `default_vault` (defaults to `homeassistant`)
+3. Optionally configure embedding providers for semantic search
+4. Start the add-on — it will automatically set your password and create the vault
+5. Open the Web UI and log in with `root` and your configured password
+6. Connect AI tools via the MCP endpoint at port 8750
 
 ---
 

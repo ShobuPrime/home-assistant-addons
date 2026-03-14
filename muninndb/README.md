@@ -54,6 +54,18 @@ The `log_level` option controls the level of log output by the addon:
 
 ---
 
+### Option: `admin_password`
+
+Sets the admin password for the MuninnDB web UI. On first startup, MuninnDB creates a default `root` / `password` account. When this option is set, the addon automatically changes the admin password after MuninnDB starts. The password must be at least 8 characters. Leave empty to keep the default (not recommended).
+
+---
+
+### Option: `default_vault`
+
+Name of a vault to automatically create on first startup. Default: `homeassistant`. The vault is created as public (no API key required). Set to empty to skip vault creation.
+
+---
+
 ### SSL / TLS
 
 To enable HTTPS on all MuninnDB ports, set both:
@@ -106,11 +118,11 @@ This addon has access to the following Home Assistant directories:
 
 ## First Time Setup
 
-1. Start the add-on
-2. Open the Web UI (port 8476) via ingress or directly
-3. Log in with default credentials: `root` / `password`
-4. **Change the default password immediately**
-5. Create vaults for your AI agents or applications
+1. Set `admin_password` in the addon configuration (at least 8 characters)
+2. Optionally set `default_vault` (defaults to `homeassistant`)
+3. Start the add-on
+4. Open the Web UI (port 8476) via ingress or directly
+5. Log in with `root` and your configured password
 6. Connect your AI tools via the MCP endpoint (port 8750)
 
 ---

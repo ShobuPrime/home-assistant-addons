@@ -36,6 +36,8 @@ map:
   - share:rw
 options:
   log_level: info
+  admin_password: ""
+  default_vault: "homeassistant"
   ssl_certfile: ""
   ssl_keyfile: ""
   mem_limit_gb: 0
@@ -52,6 +54,8 @@ options:
   voyage_key: ""
 schema:
   log_level: list(trace|debug|info|warning|error|fatal)?
+  admin_password: password?
+  default_vault: str?
   ssl_certfile: str?
   ssl_keyfile: str?
   mem_limit_gb: int?
