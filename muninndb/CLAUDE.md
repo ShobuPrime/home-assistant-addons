@@ -70,10 +70,13 @@ MuninnDB is currently in alpha. Versions follow the pattern `X.Y.Z-alpha` (e.g.,
 MuninnDB accepts these environment variables:
 - `MUNINNDB_DATA`: Data directory path
 - `MUNINN_LOCAL_EMBED`: Enable/disable bundled embedder (0/1)
-- `MUNINN_OLLAMA_URL`: Ollama service URL
+- `MUNINN_OLLAMA_URL`: Ollama service URL (e.g., `ollama://localhost:11434/nomic-embed-text`)
 - `MUNINN_OPENAI_KEY`: OpenAI API key
+- `MUNINN_OPENAI_URL`: Optional OpenAI-compatible endpoint override
+- `MUNINN_ANTHROPIC_KEY`: Anthropic API key for LLM enrichment
+- `MUNINN_ENRICH_URL`: LLM enrichment URL (e.g., `anthropic://claude-haiku-4-5-20251001`)
 - `MUNINN_MEM_LIMIT_GB`: Memory limit in GB
-- `MUNINN_VOYAGE_KEY`, `MUNINN_COHERE_KEY`, `MUNINN_GEMINI_KEY`, `MUNINN_JINA_KEY`, `MUNINN_MISTRAL_KEY`: Embedding provider keys
+- `MUNINN_VOYAGE_KEY`, `MUNINN_COHERE_KEY`, `MUNINN_GOOGLE_KEY`, `MUNINN_JINA_KEY`, `MUNINN_MISTRAL_KEY`: Embedding provider keys
 
 ### Binary Download Pattern
 The binary is downloaded directly from GitHub releases:
@@ -105,6 +108,7 @@ When updating version:
 - **AppArmor profile** is critical for security - modifications require careful testing
 - **Default credentials** are `root`/`password` — users must change on first login
 - **Pre-release handling**: The update script uses `/releases` (not `/releases/latest`) because MuninnDB is in alpha
+- **glibc dependency**: MuninnDB is a CGO binary linked against glibc (ONNX runtime for local embedder). Alpine uses musl, so `gcompat` and `libstdc++` are required in the Dockerfile. Without them the binary fails with `cannot execute: required file not found`.
 
 ## Common Issues and Troubleshooting
 

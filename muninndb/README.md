@@ -56,6 +56,18 @@ URL for an Ollama service to use for embeddings (e.g., `http://homeassistant.loc
 
 OpenAI API key for embeddings. Leave empty to skip.
 
+### Option: `openai_url`
+
+Optional override for OpenAI-compatible endpoint (e.g., `http://localhost:8080/v1` for a local model). Only used when `openai_key` is set.
+
+### Option: `anthropic_key`
+
+Anthropic API key for LLM enrichment. When set alongside `enrich_url`, MuninnDB retroactively enriches existing memories in the background.
+
+### Option: `enrich_url`
+
+LLM enrichment endpoint URL (e.g., `anthropic://claude-haiku-4-5-20251001`). Requires `anthropic_key` to be set.
+
 ### Option: `mem_limit_gb`
 
 Memory limit in gigabytes. Set to `0` for no limit (default). Useful for constraining resource usage.
@@ -65,7 +77,7 @@ Memory limit in gigabytes. Set to `0` for no limit (default). Useful for constra
 Additional embedding providers can be configured via API keys:
 - `voyage_key` — Voyage AI
 - `cohere_key` — Cohere
-- `gemini_key` — Google Gemini
+- `google_key` — Google (Gemini)
 - `jina_key` — Jina AI
 - `mistral_key` — Mistral AI
 

@@ -39,10 +39,13 @@ options:
   local_embed: true
   ollama_url: ""
   openai_key: ""
+  openai_url: ""
+  anthropic_key: ""
+  enrich_url: ""
   mem_limit_gb: 0
   voyage_key: ""
   cohere_key: ""
-  gemini_key: ""
+  google_key: ""
   jina_key: ""
   mistral_key: ""
 schema:
@@ -50,9 +53,12 @@ schema:
   local_embed: bool?
   ollama_url: str?
   openai_key: password?
+  openai_url: str?
+  anthropic_key: password?
+  enrich_url: str?
   mem_limit_gb: int?
   voyage_key: password?
   cohere_key: password?
-  gemini_key: password?
+  google_key: password?
   jina_key: password?
   mistral_key: password?
