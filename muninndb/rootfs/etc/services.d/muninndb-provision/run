@@ -6,6 +6,7 @@
 # ==============================================================================
 
 PROVISION_MARKER="/data/muninndb/.provisioned"
+STORED_PASS_FILE="/data/muninndb/.admin_pass_set"
 
 # If already provisioned and no password change requested, exit immediately
 if [[ -f "${PROVISION_MARKER}" ]]; then
@@ -35,7 +36,6 @@ fi
 
 # Determine current password (use default on first run, or stored password)
 CURRENT_PASSWORD="password"
-STORED_PASS_FILE="/data/muninndb/.admin_pass_set"
 if [[ -f "${STORED_PASS_FILE}" ]]; then
     CURRENT_PASSWORD=$(cat "${STORED_PASS_FILE}")
 fi
@@ -64,10 +64,15 @@ bashio::log.info "Logged in to MuninnDB as root"
 if bashio::config.has_value 'admin_password' && [[ -n "$(bashio::config 'admin_password')" ]]; then
     NEW_PASSWORD=$(bashio::config 'admin_password')
 
+    # Use checksums for reliable comparison (avoids shell escaping issues)
+    NEW_HASH=$(printf '%s' "${NEW_PASSWORD}" | sha256sum | cut -d' ' -f1)
+    CURRENT_HASH=$(printf '%s' "${CURRENT_PASSWORD}" | sha256sum | cut -d' ' -f1)
+
     if [[ ${#NEW_PASSWORD} -lt 8 ]]; then
         bashio::log.error "admin_password must be at least 8 characters (got ${#NEW_PASSWORD})"
-    elif [[ "${NEW_PASSWORD}" != "${CURRENT_PASSWORD}" ]]; then
-        # Build JSON payload safely using jq to handle special characters
+    elif [[ "${NEW_HASH}" != "${CURRENT_HASH}" ]]; then
+        bashio::log.info "Password change detected, updating..."
+
         PASS_PAYLOAD=$(jq -n --arg user "root" --arg pass "${NEW_PASSWORD}" \
             '{username: $user, new_password: $pass}')
 
@@ -81,7 +86,7 @@ if bashio::config.has_value 'admin_password' && [[ -n "$(bashio::config 'admin_p
 
         if [[ "${PASS_CODE}" == "200" ]] || [[ "${PASS_CODE}" == "204" ]]; then
             bashio::log.info "Admin password updated successfully"
-            echo -n "${NEW_PASSWORD}" > "${STORED_PASS_FILE}"
+            printf '%s' "${NEW_PASSWORD}" > "${STORED_PASS_FILE}"
             chmod 600 "${STORED_PASS_FILE}"
 
             # Re-login with new password for vault creation
@@ -95,31 +100,37 @@ if bashio::config.has_value 'admin_password' && [[ -n "$(bashio::config 'admin_p
             bashio::log.warning "Failed to update admin password (HTTP ${PASS_CODE}): ${PASS_BODY}"
         fi
     else
-        bashio::log.info "Admin password already matches configured value"
+        bashio::log.info "Admin password unchanged"
     fi
 fi
 
-# Create default vault if configured
+# Ensure default vault exists
 if bashio::config.has_value 'default_vault' && [[ -n "$(bashio::config 'default_vault')" ]]; then
     VAULT_NAME=$(bashio::config 'default_vault')
 
-    # Check if vault already exists
-    VAULT_CHECK=$(curl -s -w "%{http_code}" -b "${SESSION_COOKIE}" \
-        "http://127.0.0.1:8476/api/admin/vaults/config" 2>/dev/null)
+    # Check if vault already exists by querying the vaults list
+    VAULT_LIST=$(curl -s -b "${SESSION_COOKIE}" \
+        "http://127.0.0.1:8476/api/vaults" 2>/dev/null)
 
-    if echo "${VAULT_CHECK}" | grep -q "\"${VAULT_NAME}\""; then
+    if echo "${VAULT_LIST}" | jq -e --arg name "${VAULT_NAME}" \
+        'if type == "array" then map(select(.name == $name)) | length > 0
+         else .[$name] != null end' > /dev/null 2>&1; then
         bashio::log.info "Vault '${VAULT_NAME}' already exists"
     else
-        VAULT_RESPONSE=$(curl -s -w "%{http_code}" -b "${SESSION_COOKIE}" \
+        VAULT_PAYLOAD=$(jq -n --arg name "${VAULT_NAME}" \
+            '{name: $name, public: true}')
+
+        VAULT_RESPONSE=$(curl -s -w "\n%{http_code}" -b "${SESSION_COOKIE}" \
             -X PUT http://127.0.0.1:8476/api/admin/vaults/config \
             -H 'Content-Type: application/json' \
-            -d "{\"name\":\"${VAULT_NAME}\",\"public\":true}" 2>/dev/null)
+            -d "${VAULT_PAYLOAD}" 2>/dev/null)
 
-        VAULT_CODE="${VAULT_RESPONSE: -3}"
+        VAULT_CODE=$(echo "${VAULT_RESPONSE}" | tail -1)
         if [[ "${VAULT_CODE}" == "200" ]] || [[ "${VAULT_CODE}" == "201" ]] || [[ "${VAULT_CODE}" == "204" ]]; then
             bashio::log.info "Created vault '${VAULT_NAME}' (public)"
         else
-            bashio::log.warning "Failed to create vault '${VAULT_NAME}' (HTTP ${VAULT_CODE})"
+            VAULT_BODY=$(echo "${VAULT_RESPONSE}" | sed '$d')
+            bashio::log.warning "Failed to create vault '${VAULT_NAME}' (HTTP ${VAULT_CODE}): ${VAULT_BODY}"
         fi
     fi
 fi
