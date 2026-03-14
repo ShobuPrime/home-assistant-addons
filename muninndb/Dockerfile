@@ -42,7 +42,6 @@ COPY rootfs /
 
 # Ensure scripts are executable
 RUN chmod a+x /etc/cont-init.d/*.sh \
-    && chmod a+x /etc/cont-finish.d/*.sh \
     && chmod a+x /etc/services.d/*/run \
     && chmod a+x /etc/services.d/*/finish
 
