@@ -4,6 +4,8 @@
 
 MuninnDB is a cognitive database that stores engrams — memory traces with built-in decay, association learning, and confidence scoring. This add-on runs MuninnDB as a Home Assistant service, providing persistent cognitive memory accessible via multiple protocols.
 
+---
+
 ## Configuration
 
 ### Option: `log_level`
@@ -16,6 +18,8 @@ The `log_level` option controls the level of log output by the addon:
 - `error`: Runtime errors
 - `fatal`: Critical errors
 
+---
+
 ### SSL / TLS
 
 To enable HTTPS on all MuninnDB ports:
@@ -24,13 +28,19 @@ To enable HTTPS on all MuninnDB ports:
 
 Both must be set for TLS to activate. When enabled, all ports (REST, Web UI, gRPC, MCP) serve over TLS. If the files are not found at the specified paths, the addon falls back to plain HTTP with a log error.
 
+---
+
 ### Option: `mem_limit_gb`
 
 Constrains MuninnDB's memory usage. Set to `0` (default) for unlimited. Useful on resource-constrained systems.
 
+---
+
 ### Option: `local_embed`
 
 Controls the bundled ONNX Runtime embedder. When enabled (default), MuninnDB can generate embeddings locally without external API calls. Disable if you exclusively use an external provider.
+
+---
 
 ### Embedding and Enrichment Providers
 
@@ -47,6 +57,8 @@ All optional, listed alphabetically:
 - `openai_url` — Optional OpenAI-compatible endpoint override (e.g., `http://localhost:8080/v1`). Only takes effect when `openai_key` is also set.
 - `voyage_key` — Voyage AI embeddings
 
+---
+
 ## Access Methods
 
 1. **Via Sidebar**: Click the brain icon in Home Assistant (uses ingress)
@@ -55,6 +67,8 @@ All optional, listed alphabetically:
 4. **gRPC**: `[your-ip]:8477`
 5. **MBP Protocol**: `[your-ip]:8474` (lowest latency, for production agents)
 6. **MCP**: `[your-ip]:8750` (for AI tool integration)
+
+---
 
 ## Port Information
 
@@ -66,6 +80,8 @@ All optional, listed alphabetically:
 | 8477 | gRPC | Polyglot team support |
 | 8750 | MCP | AI tool integration (Claude, Cursor, VS Code, etc.) |
 
+---
+
 ## Data Persistence
 
 All data is stored in `/data/muninndb` and included in Home Assistant backups.
@@ -75,6 +91,8 @@ MuninnDB stores:
 - Vault definitions and configurations
 - Association weights (Hebbian learning state)
 - Trigger subscriptions
+
+---
 
 ## Core Concepts
 
@@ -94,6 +112,8 @@ Namespaces for engrams. Typically one vault per AI agent or user. Use vaults to 
 
 The primary query mechanism. Accepts a context string and returns the N most cognitively relevant engrams, ranked by a combination of recency, frequency, confidence, and semantic similarity.
 
+---
+
 ## First Time Setup
 
 1. Start the add-on and open the Web UI
@@ -103,12 +123,16 @@ The primary query mechanism. Accepts a context string and returns the N most cog
 5. Connect AI tools via the MCP endpoint at port 8750
 6. Optionally configure an embedding provider for semantic search
 
+---
+
 ## Security Considerations
 
 - **Default Credentials**: The default login is `root`/`password` — change this immediately
 - **AppArmor**: Custom profile restricts addon permissions appropriately
 - **API Keys**: Embedding provider keys are stored as password fields and not displayed in the UI
 - **Network Access**: All ports are exposed on the host — consider firewall rules if needed
+
+---
 
 ## Troubleshooting
 
@@ -123,6 +147,8 @@ The primary query mechanism. Accepts a context string and returns the N most cog
 2. Verify architecture compatibility (amd64/aarch64 only)
 3. Try reinstalling the addon
 
+---
+
 ### Web UI Not Accessible
 
 **Symptoms:**
@@ -133,6 +159,8 @@ The primary query mechanism. Accepts a context string and returns the N most cog
 1. Check that the addon is running (green status)
 2. Try direct access via `http://[your-ip]:8476`
 3. Check addon logs for binding errors
+
+---
 
 ### Memory Usage High
 
@@ -145,9 +173,13 @@ The primary query mechanism. Accepts a context string and returns the N most cog
 2. Disable `local_embed` if not using local embeddings
 3. Monitor engram count and prune unused vaults
 
+---
+
 ## Updating
 
 The addon automatically tracks releases. Updates appear in the Home Assistant UI when available.
+
+---
 
 ## External Resources
 
