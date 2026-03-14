@@ -38,6 +38,18 @@ Set to empty to skip vault creation. Additional vaults can be created via the We
 
 ---
 
+### Backups
+
+MuninnDB supports two layers of backup:
+
+- **Shutdown backups** (`backup_on_shutdown`, default: `true`) — Before the addon stops (for updates, restarts, or HA backups), a native MuninnDB point-in-time backup is triggered via the REST API. This creates a verified Pebble checkpoint plus WAL and auth_secret copies. Stored in `/data/muninndb/backups/shutdown-YYYYMMDD-HHMMSS/`. The last 3 shutdown backups are retained automatically.
+
+- **Automated periodic backups** (`backup_interval`) — MuninnDB's built-in backup system runs on a schedule (e.g., `6h`, `30m`). Set `backup_retain` to control how many are kept (default: `5`). Stored in `/data/muninndb/backups/`.
+
+Both backup types are stored within `/data/muninndb/` and are included when Home Assistant creates an addon backup, giving you both a native database-consistent snapshot and HA's full addon state.
+
+---
+
 ### SSL / TLS
 
 To enable HTTPS on all MuninnDB ports:

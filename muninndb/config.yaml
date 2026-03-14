@@ -38,6 +38,9 @@ options:
   log_level: info
   admin_password: ""
   default_vault: "homeassistant"
+  backup_on_shutdown: true
+  backup_interval: ""
+  backup_retain: 5
   ssl_certfile: ""
   ssl_keyfile: ""
   mem_limit_gb: 0
@@ -56,6 +59,9 @@ schema:
   log_level: list(trace|debug|info|warning|error|fatal)?
   admin_password: password?
   default_vault: str?
+  backup_on_shutdown: bool?
+  backup_interval: str?
+  backup_retain: int?
   ssl_certfile: str?
   ssl_keyfile: str?
   mem_limit_gb: int?

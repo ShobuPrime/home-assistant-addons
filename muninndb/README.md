@@ -66,6 +66,14 @@ Name of a vault to automatically create on first startup. Default: `homeassistan
 
 ---
 
+### Backups
+
+- `backup_on_shutdown` — Trigger a native MuninnDB backup before the addon stops (default: `true`). Backups are stored in `/data/muninndb/backups/` and included in Home Assistant addon backups. The last 3 shutdown backups are retained.
+- `backup_interval` — Enable automated periodic backups (e.g., `6h`, `30m`). Leave empty to disable.
+- `backup_retain` — Number of automated backups to keep (default: `5`).
+
+---
+
 ### SSL / TLS
 
 To enable HTTPS on all MuninnDB ports, set both:

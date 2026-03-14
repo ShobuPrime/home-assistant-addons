@@ -98,6 +98,21 @@ if bashio::config.has_value 'log_level'; then
     esac
 fi
 
+# Configure automated backups
+if bashio::config.has_value 'backup_interval' && [[ -n "$(bashio::config 'backup_interval')" ]]; then
+    export MUNINN_BACKUP_INTERVAL=$(bashio::config 'backup_interval')
+    export MUNINN_BACKUP_DIR="/data/muninndb/backups"
+    mkdir -p "${MUNINN_BACKUP_DIR}"
+    bashio::log.info "Automated backups: every ${MUNINN_BACKUP_INTERVAL}"
+fi
+
+if bashio::config.has_value 'backup_retain'; then
+    RETAIN=$(bashio::config 'backup_retain')
+    if [[ "${RETAIN}" -gt 0 ]]; then
+        export MUNINN_BACKUP_RETAIN="${RETAIN}"
+    fi
+fi
+
 # Build TLS flags
 TLS_FLAGS=""
 if bashio::config.has_value 'ssl_certfile' && [[ -n "$(bashio::config 'ssl_certfile')" ]]; then
