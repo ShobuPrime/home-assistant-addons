@@ -106,5 +106,9 @@ bashio::log.info "  Ports: 8474 (MBP), 8475 (REST), 8476 (Web UI), 8477 (gRPC), 
 # Change to the muninndb directory
 cd /opt/muninndb
 
-# Run MuninnDB
-exec /opt/muninndb/muninn serve
+# Run MuninnDB in foreground mode (--daemon flag runs the server process
+# directly instead of daemonizing, which is what S6 needs).
+# -listen-host 0.0.0.0 is required so ports are accessible outside the container.
+exec /opt/muninndb/muninn --daemon \
+    -data /data/muninndb \
+    -listen-host 0.0.0.0
