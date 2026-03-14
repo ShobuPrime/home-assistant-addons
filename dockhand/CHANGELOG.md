@@ -1,5 +1,27 @@
 # Changelog
 
+## [1.0.21] - 2026-03-14
+
+### Changed
+- Updated Dockhand to version 1.0.21
+
+Release date: 2026-03-13
+
+Changes:
+{
+  "type": "feature",
+  "text": "option to truncate port list (#702)"
+}
+{
+  "type": "feature",
+  "text": "log viewer supports ANSII 256 colors (#743)"
+}
+{
+  "type": "fix",
+
+---
+
+
 ## [1.0.20] - 2026-03-07
 
 ### Changed
