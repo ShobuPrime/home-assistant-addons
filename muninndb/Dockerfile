@@ -6,12 +6,16 @@ ARG MUNINNDB_VERSION=0.4.1-alpha
 
 # Install requirements
 # Upgrade first to resolve base image package version mismatches (e.g. libcrypto3/libssl3)
+# gcompat + libstdc++: MuninnDB is a CGO binary linked against glibc (ONNX runtime embedder),
+# but Alpine uses musl — gcompat provides the glibc compatibility shim
 RUN \
     apk upgrade --no-cache \
     && apk add --no-cache \
         ca-certificates \
         curl \
-        jq
+        gcompat \
+        jq \
+        libstdc++
 
 # Download and install MuninnDB
 # Release assets are raw binaries named: muninn-linux-amd64, muninn-linux-arm64

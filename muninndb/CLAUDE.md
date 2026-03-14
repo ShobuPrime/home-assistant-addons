@@ -105,6 +105,7 @@ When updating version:
 - **AppArmor profile** is critical for security - modifications require careful testing
 - **Default credentials** are `root`/`password` — users must change on first login
 - **Pre-release handling**: The update script uses `/releases` (not `/releases/latest`) because MuninnDB is in alpha
+- **glibc dependency**: MuninnDB is a CGO binary linked against glibc (ONNX runtime for local embedder). Alpine uses musl, so `gcompat` and `libstdc++` are required in the Dockerfile. Without them the binary fails with `cannot execute: required file not found`.
 
 ## Common Issues and Troubleshooting
 
