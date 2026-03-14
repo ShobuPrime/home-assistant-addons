@@ -104,9 +104,9 @@ jobs:
               # Extract version for validation
               VERSION=$(grep "^version:" "$addon_dir/config.yaml" | sed 's/version: *"\(.*\)"/\1/')
 
-              # Validate version format (semver)
-              if ! echo "$VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
-                ERRORS="${ERRORS}\n- Invalid version format in $addon_dir/config.yaml: $VERSION (should be X.Y.Z)"
+              # Validate version format (semver, with optional pre-release suffix)
+              if ! echo "$VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+([-][a-zA-Z0-9.]+)*$'; then
+                ERRORS="${ERRORS}\n- Invalid version format in $addon_dir/config.yaml: $VERSION (should be X.Y.Z or X.Y.Z-suffix)"
                 EXIT_CODE=1
               fi
             fi

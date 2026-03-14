@@ -27,7 +27,7 @@ docker run --rm -it -p 8474:8474 -p 8475:8475 -p 8476:8476 -p 8477:8477 -p 8750:
 
 MuninnDB is currently in alpha. Versions follow the pattern `X.Y.Z-alpha` (e.g., `0.4.1-alpha`). Some releases include patch suffixes like `0.3.14-alpha-1`. The project uses a single release stream — no separate LTS/STS tracks.
 
-**Important**: GitHub's `/releases/latest` endpoint skips pre-releases. The update script must use `/releases` and pick the first non-draft entry.
+**Important**: The update script prefers stable releases (non-prerelease) and only falls back to pre-releases (alpha/beta) when no stable release exists. GitHub's `/releases/latest` endpoint skips pre-releases entirely, so the script uses `/releases` to fetch all releases.
 
 ## Architecture and Key Components
 

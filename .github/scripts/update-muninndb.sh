@@ -32,16 +32,29 @@ get_latest_version() {
     local version=""
 
     for i in $(seq 1 $retries); do
-        # MuninnDB uses pre-releases (alpha), so /releases/latest won't work.
-        # Fetch all releases and pick the first non-draft entry.
-        version=$(curl -s --connect-timeout 10 "https://api.github.com/repos/scrypster/muninndb/releases" 2>/dev/null | \
-            jq -r '[.[] | select(.draft == false)] | .[0].tag_name // empty' 2>/dev/null)
+        local releases=""
+        releases=$(curl -s --connect-timeout 10 "https://api.github.com/repos/scrypster/muninndb/releases" 2>/dev/null)
 
-        if [ -n "$version" ]; then
-            # Remove 'v' prefix if present
-            version="${version#v}"
-            echo "$version"
-            return 0
+        if [ -n "$releases" ]; then
+            # Prefer stable releases (non-prerelease, non-draft)
+            version=$(echo "$releases" | jq -r \
+                '[.[] | select(.draft == false and .prerelease == false)] | .[0].tag_name // empty' 2>/dev/null)
+
+            # Fall back to pre-releases if no stable release exists
+            if [ -z "$version" ]; then
+                version=$(echo "$releases" | jq -r \
+                    '[.[] | select(.draft == false)] | .[0].tag_name // empty' 2>/dev/null)
+                if [ -n "$version" ]; then
+                    log "No stable release found, using pre-release: ${version}" >&2
+                fi
+            fi
+
+            if [ -n "$version" ]; then
+                # Remove 'v' prefix if present
+                version="${version#v}"
+                echo "$version"
+                return 0
+            fi
         fi
 
         [ $i -lt $retries ] && log "Retry $i/$retries..." >&2

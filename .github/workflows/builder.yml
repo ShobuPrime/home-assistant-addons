@@ -46,11 +46,6 @@ jobs:
           echo "addons=${addons_json}" >> "$GITHUB_OUTPUT"
           echo "All addons: ${addons_json}"
 
-      - name: Get changed files
-        id: changed_files
-        if: github.event_name != 'repository_dispatch'
-        uses: tj-actions/changed-files@v41
-
       - name: Find changed add-ons
         id: changed_addons
         run: |
@@ -62,7 +57,6 @@ jobs:
             echo "Triggered via repository_dispatch for addon: ${DISPATCH_ADDON}"
 
             if [ "${DISPATCH_ADDON}" = "all" ]; then
-              # Build all addons
               for config in */config.yaml; do
                 addon_dir=$(dirname "$config")
                 if [[ ! "$addon_dir" =~ ^\. ]]; then
@@ -74,48 +68,65 @@ jobs:
               changed_addons+=("\"${DISPATCH_ADDON}\"")
               echo "Building addon: ${DISPATCH_ADDON}"
             fi
-          else
-            # Get all addon directories dynamically
-            declare -a all_addon_dirs
+
+          elif [ "${{ github.event_name }}" = "pull_request" ]; then
+            # For PRs, diff against the base branch
+            BASE_REF="${{ github.base_ref }}"
+            git fetch origin "${BASE_REF}"
+            CHANGED_FILES=$(git diff --name-only "origin/${BASE_REF}...HEAD")
+            echo "Changed files vs ${BASE_REF}:"
+            echo "$CHANGED_FILES"
+
             for config in */config.yaml; do
               addon_dir=$(dirname "$config")
               if [[ ! "$addon_dir" =~ ^\. ]]; then
-                all_addon_dirs+=("$addon_dir")
+                if echo "$CHANGED_FILES" | grep -q "^${addon_dir}/"; then
+                  changed_addons+=("\"${addon_dir}\"")
+                  echo "Addon changed: $addon_dir"
+                fi
               fi
             done
 
-            # Check if any addon files changed
-            if [[ "${{ steps.changed_files.outputs.any_changed }}" == "true" ]]; then
-              changed_files="${{ steps.changed_files.outputs.all_changed_files }}"
+          elif [ "${{ github.event_name }}" = "push" ]; then
+            # For pushes to main/master, diff against the previous commit
+            BEFORE="${{ github.event.before }}"
+            if [ "$BEFORE" = "0000000000000000000000000000000000000000" ]; then
+              echo "Initial push, building all addons"
+              for config in */config.yaml; do
+                addon_dir=$(dirname "$config")
+                if [[ ! "$addon_dir" =~ ^\. ]]; then
+                  changed_addons+=("\"${addon_dir}\"")
+                fi
+              done
+            else
+              CHANGED_FILES=$(git diff --name-only "${BEFORE}...HEAD")
+              echo "Changed files since ${BEFORE}:"
+              echo "$CHANGED_FILES"
 
-              for addon in "${all_addon_dirs[@]}"; do
-                # Check if any file in this addon directory changed
-                if echo "$changed_files" | grep -q "^${addon}/\|${addon}/"; then
-                  changed_addons+=("\"${addon}\"")
-                  echo "Addon changed: $addon"
+              for config in */config.yaml; do
+                addon_dir=$(dirname "$config")
+                if [[ ! "$addon_dir" =~ ^\. ]]; then
+                  if echo "$CHANGED_FILES" | grep -q "^${addon_dir}/"; then
+                    changed_addons+=("\"${addon_dir}\"")
+                    echo "Addon changed: $addon_dir"
+                  fi
                 fi
               done
             fi
-
-            # If no changes detected (e.g., initial commit or workflow changes), build all addons
-            if [[ ${#changed_addons[@]} -eq 0 ]]; then
-              echo "No addon-specific changes detected, building all addons"
-              for addon in "${all_addon_dirs[@]}"; do
-                changed_addons+=("\"${addon}\"")
-              done
-            fi
           fi
 
-          changed=$(echo ${changed_addons[@]} | jq -sc '.')
-          echo "addons=${changed}" >> "$GITHUB_OUTPUT"
-
-          if [[ ${#changed_addons[@]} -gt 0 ]]; then
-            echo "changed=true" >> "$GITHUB_OUTPUT"
-          else
+          # Fallback: if no addon-specific changes detected, skip building
+          if [[ ${#changed_addons[@]} -eq 0 ]]; then
+            echo "No addon-specific changes detected, skipping builds"
             echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo 'addons=[]' >> "$GITHUB_OUTPUT"
+          else
+            changed=$(echo ${changed_addons[@]} | jq -sc '.')
+            echo "addons=${changed}" >> "$GITHUB_OUTPUT"
+            echo "changed=true" >> "$GITHUB_OUTPUT"
           fi
 
-          echo "Changed addons: ${changed}"
+          echo "Changed addons: $(echo ${changed_addons[@]} | jq -sc '.')"
 
   build:
     needs: init
