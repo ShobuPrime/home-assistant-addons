@@ -30,6 +30,24 @@ if bashio::config.has_value 'openai_key' && [[ -n "$(bashio::config 'openai_key'
     bashio::log.info "OpenAI embeddings configured"
 fi
 
+# Configure OpenAI-compatible endpoint override
+if bashio::config.has_value 'openai_url' && [[ -n "$(bashio::config 'openai_url')" ]]; then
+    export MUNINN_OPENAI_URL=$(bashio::config 'openai_url')
+    bashio::log.info "OpenAI URL override: ${MUNINN_OPENAI_URL}"
+fi
+
+# Configure Anthropic API key for LLM enrichment
+if bashio::config.has_value 'anthropic_key' && [[ -n "$(bashio::config 'anthropic_key')" ]]; then
+    export MUNINN_ANTHROPIC_KEY=$(bashio::config 'anthropic_key')
+    bashio::log.info "Anthropic API key configured"
+fi
+
+# Configure LLM enrichment URL (e.g., anthropic://claude-haiku-4-5-20251001)
+if bashio::config.has_value 'enrich_url' && [[ -n "$(bashio::config 'enrich_url')" ]]; then
+    export MUNINN_ENRICH_URL=$(bashio::config 'enrich_url')
+    bashio::log.info "LLM enrichment URL: ${MUNINN_ENRICH_URL}"
+fi
+
 # Configure memory limit
 if bashio::config.has_value 'mem_limit_gb'; then
     MEM_LIMIT=$(bashio::config 'mem_limit_gb')
@@ -50,9 +68,9 @@ if bashio::config.has_value 'cohere_key' && [[ -n "$(bashio::config 'cohere_key'
     bashio::log.info "Cohere embeddings configured"
 fi
 
-if bashio::config.has_value 'gemini_key' && [[ -n "$(bashio::config 'gemini_key')" ]]; then
-    export MUNINN_GEMINI_KEY=$(bashio::config 'gemini_key')
-    bashio::log.info "Gemini embeddings configured"
+if bashio::config.has_value 'google_key' && [[ -n "$(bashio::config 'google_key')" ]]; then
+    export MUNINN_GOOGLE_KEY=$(bashio::config 'google_key')
+    bashio::log.info "Google (Gemini) embeddings configured"
 fi
 
 if bashio::config.has_value 'jina_key' && [[ -n "$(bashio::config 'jina_key')" ]]; then
