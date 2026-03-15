@@ -2,37 +2,13 @@
 ARG BUILD_FROM=ghcr.io/hassio-addons/base:20.0.1
 ARG MUNINNDB_VERSION=0.4.1-alpha
 
-# Stage 1: Build MuninnDB from source with embedded ONNX model
-# The release binary does NOT include the local embedder (-tags localassets).
-# Building from source ensures semantic search works out of the box.
-FROM golang:1.26-bookworm AS builder
+# ---------------------------------------------------------------------------
+# Stage 1: Extract glibc runtime libraries
+# NO dependency on MUNINNDB_VERSION — cached permanently until Go base
+# image changes.
+# ---------------------------------------------------------------------------
+FROM golang:1.26-bookworm AS glibc-provider
 
-ARG MUNINNDB_VERSION
-
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl make ca-certificates nodejs npm \
-    && rm -rf /var/lib/apt/lists/*
-
-WORKDIR /src
-
-# Clone the specific release tag
-RUN git clone --depth 1 --branch "v${MUNINNDB_VERSION}" \
-    https://github.com/scrypster/muninndb.git .
-
-# Detect target architecture for ORT library
-ARG TARGETARCH
-
-# Fetch ONNX model and platform-specific ORT native library
-RUN make fetch-model _ort-linux-${TARGETARCH}
-
-# Build web assets (Tailwind CSS via Vite)
-RUN cd web && npm ci --ignore-scripts && npm run build
-
-# Build the server binary WITH local assets embedded
-RUN go build -tags localassets -ldflags="-s -w" -o /muninndb-server ./cmd/muninn/...
-
-# Collect the glibc runtime libs the binary needs into a single directory.
-# This handles both amd64 and aarch64 architectures transparently.
 RUN mkdir -p /glibc-libs \
     && ARCH="$(uname -m)" \
     && if [ "${ARCH}" = "x86_64" ]; then \
@@ -53,11 +29,67 @@ RUN mkdir -p /glibc-libs \
     && echo "${LIB_DIR}" > /glibc-libs/.lib_dir \
     && echo "${LD_PATH}" > /glibc-libs/.ld_path
 
-# Stage 2: Runtime image
+# ---------------------------------------------------------------------------
+# Stage 2: Clone source and fetch ONNX assets
+# Shared base for both web and Go build stages.
+# ---------------------------------------------------------------------------
+FROM golang:1.26-bookworm AS source
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl make ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /src
+
+ARG MUNINNDB_VERSION
+
+RUN git clone --depth 1 --branch "v${MUNINNDB_VERSION}" \
+    https://github.com/scrypster/muninndb.git .
+
+ARG TARGETARCH
+
+# Fetch ONNX model and platform-specific ORT native library
+RUN make fetch-model _ort-linux-${TARGETARCH}
+
+# ---------------------------------------------------------------------------
+# Stage 3: Build web assets (Tailwind CSS via Vite)
+# Runs independently from the Go build. npm ci + vite build are isolated
+# here so the Go compilation doesn't wait on them.
+# ---------------------------------------------------------------------------
+FROM node:20-bookworm-slim AS web-builder
+
+WORKDIR /src/web
+
+# Copy only package files first for npm cache efficiency
+COPY --from=source /src/web/package.json /src/web/package-lock.json ./
+RUN npm ci --ignore-scripts
+
+# Copy rest of web source and build (output: static/dist/)
+COPY --from=source /src/web ./
+RUN npm run build
+
+# ---------------------------------------------------------------------------
+# Stage 4: Build MuninnDB Go binary with embedded ONNX model
+# The release binary does NOT include the local embedder (-tags localassets).
+# Building from source ensures semantic search works out of the box.
+# ---------------------------------------------------------------------------
+FROM source AS builder
+
+# Copy built web assets from the web-builder stage
+COPY --from=web-builder /src/web/static/dist ./web/static/dist
+
+# Build the server binary WITH local assets embedded
+RUN --mount=type=cache,target=/root/.cache/go-build \
+    --mount=type=cache,target=/go/pkg/mod \
+    go build -tags localassets -ldflags="-s -w" -o /muninndb-server ./cmd/muninn/...
+
+# ---------------------------------------------------------------------------
+# Stage 5: Runtime image
+# ---------------------------------------------------------------------------
 FROM $BUILD_FROM
 
-# Install requirements
-# Upgrade first to resolve base image package version mismatches (e.g. libcrypto3/libssl3)
+# Install requirements — cached across MuninnDB version updates
+# Upgrade first to resolve base image package version mismatches
 RUN \
     apk upgrade --no-cache \
     && apk add --no-cache \
@@ -65,11 +97,10 @@ RUN \
         curl \
         jq
 
-# Copy glibc runtime from the builder stage (Debian bookworm).
-# MuninnDB is a CGO binary linked against glibc for ONNX Runtime, but Alpine
-# uses musl. Copying the exact glibc that the binary was compiled against
-# avoids third-party compatibility packages.
-COPY --from=builder /glibc-libs /tmp/glibc-libs
+# Copy glibc runtime from the glibc-provider stage (Debian bookworm).
+# This stage is independent of MUNINNDB_VERSION, so this COPY is cached
+# across MuninnDB updates — only invalidated if the Go base image changes.
+COPY --from=glibc-provider /glibc-libs /tmp/glibc-libs
 RUN LIB_DIR=$(cat /tmp/glibc-libs/.lib_dir) \
     && LD_PATH=$(cat /tmp/glibc-libs/.ld_path) \
     && mkdir -p "${LIB_DIR}" "$(dirname "${LD_PATH}")" \
@@ -83,14 +114,14 @@ RUN LIB_DIR=$(cat /tmp/glibc-libs/.lib_dir) \
     && cp /tmp/glibc-libs/ld-linux.so "${LD_PATH}" \
     && rm -rf /tmp/glibc-libs
 
-# Copy the built binary from the builder stage
+# Copy the built binary — only layer that changes on version update
 RUN mkdir -p /opt/muninndb
 COPY --from=builder /muninndb-server /opt/muninndb/muninn
 RUN chmod +x /opt/muninndb/muninn \
     && echo "MuninnDB installed successfully" \
     && ls -lh /opt/muninndb/muninn
 
-# Copy root filesystem
+# Copy root filesystem — only rebuilds if rootfs scripts change
 COPY rootfs /
 
 # Ensure scripts are executable
