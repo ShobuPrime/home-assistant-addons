@@ -39,7 +39,7 @@ options:
   admin_password: ""
   default_vault: "homeassistant"
   backup_on_shutdown: true
-  backup_interval: ""
+  backup_interval: "6h"
   backup_retain: 5
   ssl_certfile: ""
   ssl_keyfile: ""
