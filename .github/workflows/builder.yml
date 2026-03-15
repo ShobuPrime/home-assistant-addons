@@ -11,6 +11,12 @@ on:
       - master
   repository_dispatch:
     types: [automated-pr-created]
+  workflow_dispatch:
+    inputs:
+      addon:
+        description: 'Addon to build (or "all")'
+        required: true
+        type: string
 
 jobs:
   init:
@@ -51,10 +57,16 @@ jobs:
         run: |
           declare -a changed_addons
 
-          # For repository_dispatch, use the addon from client_payload
-          if [ "${{ github.event_name }}" = "repository_dispatch" ]; then
+          # For manual dispatch or repository_dispatch, use the specified addon
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            DISPATCH_ADDON="${{ github.event.inputs.addon }}"
+            echo "Triggered manually for addon: ${DISPATCH_ADDON}"
+          elif [ "${{ github.event_name }}" = "repository_dispatch" ]; then
             DISPATCH_ADDON="${{ github.event.client_payload.addon }}"
             echo "Triggered via repository_dispatch for addon: ${DISPATCH_ADDON}"
+          fi
+
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] || [ "${{ github.event_name }}" = "repository_dispatch" ]; then
 
             if [ "${DISPATCH_ADDON}" = "all" ]; then
               for config in */config.yaml; do
