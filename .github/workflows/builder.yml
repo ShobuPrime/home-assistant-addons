@@ -152,3 +152,66 @@ jobs:
             --image ${{ matrix.addon }} \
             --amd64 \
             --aarch64
+
+  smoke-test:
+    needs: init
+    runs-on: ubuntu-latest
+    if: needs.init.outputs.changed == 'true'
+    name: Smoke test ${{ matrix.addon }}
+    strategy:
+      fail-fast: false
+      matrix:
+        addon: ${{ fromJson(needs.init.outputs.changed_addons) }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'repository_dispatch' && github.event.client_payload.head_sha || '' }}
+
+      - name: Get build config
+        id: config
+        run: |
+          ADDON="${{ matrix.addon }}"
+          VERSION=$(grep "^version:" "${ADDON}/config.yaml" | sed 's/version: *"\(.*\)"/\1/')
+          BASE_IMAGE=$(grep "amd64:" "${ADDON}/build.yaml" | head -1 | awk '{print $2}')
+          IMAGE_TAG="smoke-test/${ADDON}:${VERSION}"
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "base_image=${BASE_IMAGE}" >> $GITHUB_OUTPUT
+          echo "image_tag=${IMAGE_TAG}" >> $GITHUB_OUTPUT
+
+      - name: Build image for smoke test (amd64)
+        run: |
+          ADDON="${{ matrix.addon }}"
+
+          # Extract the version ARG name from build.yaml (e.g., MUNINNDB_VERSION, ARCANE_VERSION)
+          VERSION_ARG=$(grep -E '_VERSION:' "${ADDON}/build.yaml" | head -1 | awk -F: '{print $1}' | xargs)
+          VERSION_VAL=$(grep -E '_VERSION:' "${ADDON}/build.yaml" | head -1 | awk -F: '{print $2}' | xargs)
+
+          BUILD_ARGS=(
+            --build-arg "BUILD_FROM=${{ steps.config.outputs.base_image }}"
+            --build-arg "BUILD_ARCH=amd64"
+            --build-arg "BUILD_VERSION=${{ steps.config.outputs.version }}"
+            --build-arg "BUILD_NAME=${ADDON}"
+            --build-arg "BUILD_DESCRIPTION=Smoke test"
+            --build-arg "BUILD_REF=$(git rev-parse --short HEAD)"
+            --build-arg "BUILD_REPOSITORY=local"
+            --build-arg "BUILD_DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            --build-arg "TARGETARCH=amd64"
+          )
+
+          if [ -n "${VERSION_ARG}" ] && [ -n "${VERSION_VAL}" ]; then
+            BUILD_ARGS+=(--build-arg "${VERSION_ARG}=${VERSION_VAL}")
+          fi
+
+          echo "Building ${ADDON} for smoke test..."
+          docker build \
+            "${BUILD_ARGS[@]}" \
+            -t "${{ steps.config.outputs.image_tag }}" \
+            "./${ADDON}"
+
+      - name: Run smoke test
+        run: |
+          IMAGE_NAME="${{ steps.config.outputs.image_tag }}" \
+            bash .github/scripts/smoke-test.sh \
+            "${{ matrix.addon }}" \
+            "${{ steps.config.outputs.image_tag }}"
