@@ -44,6 +44,7 @@ options:
   ssl_certfile: ""
   ssl_keyfile: ""
   mem_limit_gb: 0
+  local_embed: true
   anthropic_key: ""
   cohere_key: ""
   enrich_url: ""
@@ -64,6 +65,7 @@ schema:
   ssl_certfile: str?
   ssl_keyfile: str?
   mem_limit_gb: int?
+  local_embed: bool?
   anthropic_key: password?
   cohere_key: password?
   enrich_url: str?

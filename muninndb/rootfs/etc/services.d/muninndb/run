@@ -9,9 +9,14 @@ bashio::log.info 'Starting MuninnDB...'
 # Set data directory
 export MUNINNDB_DATA="/data/muninndb"
 
-# Local ONNX embedder is built into the binary (bge-small-en-v1.5, 384-dim).
-# It activates automatically unless an external provider is configured or
-# the user explicitly sets MUNINN_LOCAL_EMBED=0.
+# Local ONNX embedder (bge-small-en-v1.5, 384-dim) is built into the binary.
+# Enabled by default. Disable if using an external provider exclusively.
+if bashio::config.true 'local_embed'; then
+    export MUNINN_LOCAL_EMBED="1"
+else
+    export MUNINN_LOCAL_EMBED="0"
+    bashio::log.info "Local embedder disabled"
+fi
 
 # Configure Ollama integration
 if bashio::config.has_value 'ollama_url' && [[ -n "$(bashio::config 'ollama_url')" ]]; then
