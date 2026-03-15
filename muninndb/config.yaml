@@ -38,6 +38,7 @@ options:
   log_level: info
   admin_password: ""
   default_vault: "homeassistant"
+  default_vault_public: true
   backup_on_shutdown: true
   backup_interval: "6h"
   backup_retain: 5
@@ -59,6 +60,7 @@ schema:
   log_level: list(trace|debug|info|warning|error|fatal)?
   admin_password: password?
   default_vault: str?
+  default_vault_public: bool?
   backup_on_shutdown: bool?
   backup_interval: str?
   backup_retain: int?

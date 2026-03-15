@@ -123,8 +123,13 @@ if bashio::config.has_value 'default_vault' && [[ -n "$(bashio::config 'default_
         'index($name) != null' > /dev/null 2>&1; then
         bashio::log.info "Vault '${VAULT_NAME}' already exists"
     else
-        VAULT_PAYLOAD=$(jq -n --arg name "${VAULT_NAME}" \
-            '{name: $name, public: true}')
+        VAULT_PUBLIC=true
+        if ! bashio::config.true 'default_vault_public'; then
+            VAULT_PUBLIC=false
+        fi
+
+        VAULT_PAYLOAD=$(jq -n --arg name "${VAULT_NAME}" --argjson public "${VAULT_PUBLIC}" \
+            '{name: $name, public: $public}')
 
         VAULT_RESPONSE=$(curl -s -w "\n%{http_code}" -b "${SESSION_COOKIE}" \
             -X PUT http://127.0.0.1:8476/api/admin/vaults/config \
@@ -133,7 +138,11 @@ if bashio::config.has_value 'default_vault' && [[ -n "$(bashio::config 'default_
 
         VAULT_CODE=$(echo "${VAULT_RESPONSE}" | tail -1)
         if [[ "${VAULT_CODE}" == "200" ]] || [[ "${VAULT_CODE}" == "201" ]] || [[ "${VAULT_CODE}" == "204" ]]; then
-            bashio::log.info "Created vault '${VAULT_NAME}' (public)"
+            if [[ "${VAULT_PUBLIC}" == "true" ]]; then
+                bashio::log.info "Created vault '${VAULT_NAME}' (public)"
+            else
+                bashio::log.info "Created vault '${VAULT_NAME}' (private — API key required)"
+            fi
         else
             VAULT_BODY=$(echo "${VAULT_RESPONSE}" | sed '$d')
             bashio::log.warning "Failed to create vault '${VAULT_NAME}' (HTTP ${VAULT_CODE}): ${VAULT_BODY}"
